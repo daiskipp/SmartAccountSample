@@ -1,0 +1,58 @@
+{
+  "name": "account-sample",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "dev",
+  "workspaceFolder": "/workspaces/account-sample",
+  "remoteUser": "vscode",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "forwardPorts": [8080, 8000, 3000, 3001, 5173],
+  "portsAttributes": {
+    "8080": {
+      "label": "Docs preview (recovery-levels-demo.html)"
+    },
+    "8000": {
+      "label": "Stellar Localnet"
+    },
+    "3000": {
+      "label": "account-sample dev server (cargo run)"
+    },
+    "3001": {
+      "label": "StellarView Explorer (localnet)"
+    },
+    "5173": {
+      "label": "account-sample frontend (Vite HTTPS)"
+    }
+  },
+  "otherPortsAttributes": {
+    "onAutoForward": "ignore"
+  },
+  "remoteEnv": {
+    "ACCOUNTSAMPLE_SHELL": "devcontainer",
+    "PATH": "/home/vscode/.cargo/bin:/home/vscode/.npm-global/bin:/home/vscode/.local/bin:${containerEnv:PATH}",
+    "STELLAR_NETWORK": "local",
+    "STELLAR_RPC_URL": "http://stellar-localnet:8000/rpc",
+    "STELLAR_FRIENDBOT_URL": "http://stellar-localnet:8000/friendbot",
+    "STELLAR_NETWORK_PASSPHRASE": "Standalone Network ; February 2017",
+    "RELAY_CHANNELS_URL": "http://openzeppelin-relayer:8080/api/v1/plugins/channels/call",
+    "RELAY_CHANNELS_API_KEY_FILE": "/run/account-sample-relayer/api-key",
+    "RELAY_ALLOWED_ORIGIN": "https://localhost:5173",
+    "RELAY_NETWORK_PASSPHRASE": "Standalone Network ; February 2017",
+    "RELAY_WALLET_ROOTS": "GAAH4OT36RRCCAGKARGPN2HLHT2NOBVFHO4GUHA6CF7UKQ4MMV24WQ4N",
+    "RELAY_FUNCTIONS": "",
+    "RELAY_WASM_HASHES": "8b650bdfe7942b2ab9791c4c975d7092481d4f29e956391532aa9767fe5f96d5",
+    "RELAY_MANAGED_ACCOUNT_WASM_HASHES": "8b650bdfe7942b2ab9791c4c975d7092481d4f29e956391532aa9767fe5f96d5"
+  },
+  "postCreateCommand": "bash .devcontainer/setup-all.sh --update-ai-clis",
+  "postStartCommand": "bash .devcontainer/setup-all.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "esbenp.prettier-vscode",
+        "yzhang.markdown-all-in-one",
+        "streetsidesoftware.code-spell-checker"
+      ]
+    }
+  }
+}

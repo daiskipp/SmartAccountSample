@@ -1,0 +1,180 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: root
+    command: >
+      bash -lc "chown -R vscode:vscode
+      /home/vscode/.account-sample-devcontainer
+      /home/vscode/.npm-global
+      /home/vscode/.local
+      /home/vscode/.cargo
+      /home/vscode/.rustup
+      /home/vscode/.claude
+      /home/vscode/.codex
+      /home/vscode/.config/stellar
+      && sleep infinity"
+    working_dir: /workspaces/account-sample
+    volumes:
+      - ..:/workspaces/account-sample:cached
+      - account-sample-home-state:/home/vscode/.account-sample-devcontainer
+      - account-sample-npm-global:/home/vscode/.npm-global
+      - account-sample-user-local-bin:/home/vscode/.local/bin
+      - account-sample-cargo:/home/vscode/.cargo
+      - account-sample-rustup:/home/vscode/.rustup
+      - account-sample-claude:/home/vscode/.claude
+      - account-sample-codex:/home/vscode/.codex
+      - account-sample-stellar-config:/home/vscode/.config/stellar
+      - /var/run/docker.sock:/var/run/docker.sock
+      - account-sample-relayer-secrets:/run/account-sample-relayer:ro
+    environment:
+      ACCOUNTSAMPLE_SHELL: devcontainer
+      STELLAR_NETWORK: local
+      STELLAR_RPC_URL: http://stellar-localnet:8000/rpc
+      STELLAR_FRIENDBOT_URL: http://stellar-localnet:8000/friendbot
+      STELLAR_NETWORK_PASSPHRASE: Standalone Network ; February 2017
+      RELAY_CHANNELS_URL: http://openzeppelin-relayer:8080/api/v1/plugins/channels/call
+      RELAY_CHANNELS_API_KEY_FILE: /run/account-sample-relayer/api-key
+      RELAY_ALLOWED_ORIGIN: https://localhost:5173
+      RELAY_NETWORK_PASSPHRASE: Standalone Network ; February 2017
+      RELAY_WALLET_ROOTS: GAAH4OT36RRCCAGKARGPN2HLHT2NOBVFHO4GUHA6CF7UKQ4MMV24WQ4N
+      RELAY_FUNCTIONS: ""
+      RELAY_WASM_HASHES: 8b650bdfe7942b2ab9791c4c975d7092481d4f29e956391532aa9767fe5f96d5
+      RELAY_MANAGED_ACCOUNT_WASM_HASHES: 8b650bdfe7942b2ab9791c4c975d7092481d4f29e956391532aa9767fe5f96d5
+      PATH: /home/vscode/.cargo/bin:/home/vscode/.npm-global/bin:/home/vscode/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    depends_on:
+      stellar-localnet:
+        condition: service_started
+      openzeppelin-relayer-bootstrap:
+        condition: service_completed_successfully
+    networks:
+      - account-sample-devcontainer
+
+  stellar-localnet:
+    image: stellar/quickstart:testing
+    # Daemon restart / unexpected crash → bring it back automatically. Manual
+    # `docker stop` is honoured; setup-stellar-localnet.sh covers that case.
+    restart: unless-stopped
+    command:
+      - --local
+      - --enable
+      - core,horizon,rpc,lab
+      - --limits
+      - testnet
+      # Pinned to match the protocol version smart-account-kit's Soroban
+      # contracts build against elsewhere (see RPG's docker-compose.yml for
+      # the same pin + rationale). Bump this if/when that changes.
+      - --protocol-version
+      - "27"
+    # Not published to the host by default — the dev container reaches it at
+    # stellar-localnet:8000 over the compose network. Enable the port below
+    # only if you need to hit RPC directly from the host (curl / Stellar Lab).
+    ports:
+      - "${ACCOUNTSAMPLE_LOCALNET_HOST_PORT:-8011}:8000"
+    # core/horizon/rpc take ~20-90s to sync after the container starts, and
+    # friendbot can lag a few seconds behind rpc reporting healthy (its own
+    # process isn't wired up yet, so its proxy returns 502). Without this,
+    # dependents that start as soon as the container exists (service_started)
+    # race ahead and hit ECONNREFUSED / 502 against friendbot/rpc. Requiring
+    # friendbot to return exactly 400 (its own "missing addr" validation
+    # error) rather than just curl -f succeeding is deliberate: it proves
+    # friendbot's own process is answering, not just that *something*
+    # responded on the port.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl -sf -X POST http://localhost:8000/rpc
+          -H 'Content-Type: application/json'
+          -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'
+          | grep -q '"status":"healthy"'
+          && [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/friendbot)" = "400" ]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 10s
+    # Do not persist quickstart localnet state across restarts — the local
+    # history archive can become inconsistent, breaking RPC captive-core
+    # catchup. Recreate the container to reset.
+    networks:
+      - account-sample-devcontainer
+
+  openzeppelin-relayer-secrets:
+    build:
+      context: ./relayer
+    user: root
+    entrypoint: ["/bin/sh", "/app/init-secrets.sh"]
+    volumes:
+      - account-sample-relayer-secrets:/run/account-sample-relayer
+    restart: "no"
+    networks:
+      - account-sample-devcontainer
+
+  openzeppelin-relayer-redis:
+    image: redis:7.4-bookworm
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - account-sample-relayer-redis:/data
+    restart: unless-stopped
+    networks:
+      - account-sample-devcontainer
+
+  openzeppelin-relayer:
+    build:
+      context: ./relayer
+    environment:
+      REDIS_URL: redis://openzeppelin-relayer-redis:6379
+      LOG_LEVEL: info
+      STELLAR_NETWORK: localnet
+      STELLAR_NETWORK_PASSPHRASE: Standalone Network ; February 2017
+      FUND_RELAYER_ID: channels-fund
+      LOCK_TTL_SECONDS: "30"
+    volumes:
+      - account-sample-relayer-secrets:/run/account-sample-relayer:ro
+    depends_on:
+      openzeppelin-relayer-secrets:
+        condition: service_completed_successfully
+      openzeppelin-relayer-redis:
+        condition: service_started
+      stellar-localnet:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+    networks:
+      - account-sample-devcontainer
+
+  openzeppelin-relayer-bootstrap:
+    build:
+      context: ./relayer
+    entrypoint: ["node", "/app/account-sample-relayer-bootstrap.mjs"]
+    volumes:
+      - account-sample-relayer-secrets:/run/account-sample-relayer:ro
+    depends_on:
+      openzeppelin-relayer:
+        condition: service_healthy
+      stellar-localnet:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - account-sample-devcontainer
+
+networks:
+  account-sample-devcontainer:
+    driver: bridge
+
+volumes:
+  account-sample-home-state:
+  account-sample-npm-global:
+  account-sample-user-local-bin:
+  account-sample-cargo:
+  account-sample-rustup:
+  account-sample-claude:
+  account-sample-codex:
+  account-sample-stellar-config:
+  account-sample-relayer-secrets:
+  account-sample-relayer-redis:

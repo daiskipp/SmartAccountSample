@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>リカバリ設計 L0〜L5 サンプル実装</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --paper:#f4f2ec; --paper-2:#efece4; --ink:#1a1815; --ink-soft:#5c574e; --ink-faint:#9c958a;
+  --line:#ddd8cc; --line-strong:#c8c2b3; --surface:#fbfaf6; --accent:#b5481f; --accent-soft:#f3e3da;
+  --when:#2f6d63; --who:#8a5a1f; --cond:#5a4a8a;
+  --when-bg:#e6efed; --who-bg:#f1e8dc; --cond-bg:#ebe7f3;
+  --ok:#2f6d63; --warn:#b5481f;
+  --radius:10px; --radius-sm:6px;
+  --mono:'DM Mono',ui-monospace,monospace; --sans:'DM Sans',system-ui,sans-serif; --serif:'Fraunces',Georgia,serif;
+}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(var(--line) 0.5px,transparent 0.5px);background-size:22px 22px;}
+.wrap{max-width:920px;margin:0 auto;padding:40px 24px 100px}
+
+header{border-bottom:1.5px solid var(--ink);padding-bottom:28px;margin-bottom:8px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);
+  display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.eyebrow::before{content:"";width:26px;height:1.5px;background:var(--accent)}
+h1{font-family:var(--serif);font-weight:300;font-size:clamp(28px,4.2vw,42px);letter-spacing:-.01em;margin-bottom:10px}
+h1 em{font-style:italic;color:var(--accent)}
+.lede{font-size:14px;color:var(--ink-soft);max-width:640px}
+
+/* level nav */
+.levelnav{display:flex;gap:6px;margin:28px 0;flex-wrap:wrap}
+.lbtn{font-family:var(--mono);font-size:11.5px;padding:9px 14px;border:1.5px solid var(--line-strong);
+  border-radius:100px;background:var(--surface);color:var(--ink-soft);cursor:pointer;transition:.12s}
+.lbtn:hover{border-color:var(--ink)}
+.lbtn.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.lbtn.done::after{content:" ✓";color:var(--ok)}
+
+/* current state summary */
+.statebar{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 20px;margin-bottom:28px;
+  font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);display:flex;gap:24px;flex-wrap:wrap}
+.statebar b{color:var(--ink);font-weight:500}
+.statebar .pill{background:var(--paper-2);border:1px solid var(--line);border-radius:4px;padding:2px 8px;color:var(--ink)}
+
+section.level{display:none}
+section.level.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+h2{font-family:var(--serif);font-weight:400;font-size:26px;margin-bottom:8px}
+.desc{font-size:13.5px;color:var(--ink-soft);max-width:640px;margin-bottom:22px}
+.desc b{color:var(--ink);font-weight:600}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px;margin-bottom:18px}
+.panel h3{font-size:13.5px;font-weight:600;margin-bottom:12px;letter-spacing:-.01em}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+
+button.act{font-family:var(--sans);font-size:13px;font-weight:500;padding:9px 16px;border-radius:var(--radius-sm);
+  border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer;transition:.12s}
+button.act:hover{background:var(--accent);border-color:var(--accent)}
+button.act.ghost{background:transparent;color:var(--ink)}
+button.act.ghost:hover{background:var(--paper-2);color:var(--ink);border-color:var(--ink)}
+button.act:disabled{opacity:.35;cursor:not-allowed}
+button.act.danger{background:var(--warn);border-color:var(--warn)}
+
+input[type=text]{font-family:var(--mono);font-size:12.5px;padding:9px 11px;border:1px solid var(--line-strong);
+  border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);width:100%;max-width:360px}
+
+.mono{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);word-break:break-all}
+.wordbox{font-family:var(--mono);font-size:13px;background:var(--paper-2);border:1.5px dashed var(--line-strong);
+  border-radius:var(--radius-sm);padding:14px 16px;line-height:2;color:var(--ink)}
+.wordbox span{display:inline-block;background:var(--surface);border:1px solid var(--line);border-radius:4px;
+  padding:2px 8px;margin:2px 4px 2px 0}
+
+.rulebox{font-family:var(--mono);font-size:11.5px;border:1.5px solid var(--line-strong);border-radius:var(--radius-sm);
+  background:var(--paper-2);overflow:hidden}
+.rule-head{padding:8px 14px;background:var(--ink);color:var(--paper);font-size:10.5px;letter-spacing:.04em}
+.rule-row{display:flex;padding:8px 14px;border-bottom:1px solid var(--line);gap:10px}
+.rule-row:last-child{border-bottom:none}
+.rule-k{color:var(--ink-faint);min-width:80px;flex-shrink:0}
+.rule-v .sig{color:var(--who)}
+.rule-v .pol{color:var(--cond)}
+.rule-v .ctx{color:var(--when)}
+
+.guardian-list{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.gcard{border:1.5px solid var(--line-strong);border-radius:var(--radius-sm);padding:10px 14px;background:var(--paper);
+  cursor:pointer;font-family:var(--mono);font-size:11.5px;transition:.12s;display:flex;align-items:center;gap:8px}
+.gcard.checked{border-color:var(--ok);background:var(--when-bg)}
+.gcard .dot{width:8px;height:8px;border-radius:50%;background:var(--line-strong)}
+.gcard.checked .dot{background:var(--ok)}
+
+.log{font-family:var(--mono);font-size:11px;color:var(--ink-soft);background:var(--paper-2);border-radius:var(--radius-sm);
+  padding:12px 14px;max-height:180px;overflow-y:auto;border:1px solid var(--line)}
+.log div{padding:2px 0;border-bottom:1px dotted var(--line)}
+.log div:last-child{border-bottom:none}
+.log .ok{color:var(--ok)}
+.log .warn{color:var(--warn)}
+
+.badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;padding:4px 10px;
+  border-radius:100px;background:var(--when-bg);color:var(--when);border:1px solid var(--when)}
+.badge.pending{background:var(--cond-bg);color:var(--cond);border-color:var(--cond)}
+.badge.danger{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+
+.timer{font-family:var(--mono);font-size:32px;font-weight:500;color:var(--ink);margin:8px 0}
+.progress{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:10px 0}
+.progress-bar{height:100%;background:var(--cond);transition:width .3s linear}
+
+.note{font-size:12px;color:var(--ink-soft);background:var(--accent-soft);border-left:2px solid var(--accent);
+  padding:9px 13px;border-radius:0 var(--radius-sm) var(--radius-sm) 0;margin-top:12px}
+.note b{color:var(--accent)}
+
+.footer-nav{display:flex;justify-content:space-between;margin-top:28px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Sample Implementation · L0 – L5</div>
+  <h1>リカバリ設計 <em>段階別</em> サンプル実装</h1>
+  <p class="lede">実際のWeb Crypto APIを使い、各レベルの鍵生成・ハッシュ照合・しきい値判定を体験できるデモ。オンチェーン送信は行わず、すべてこのページ内のみで完結する。</p>
+</header>
+
+<div class="levelnav" id="levelnav"></div>
+
+<div class="statebar" id="statebar"></div>
+
+<!-- L0 -->
+<section class="level" data-level="0">
+  <div class="tag">Level 0</div>
+  <h2>単独パスキー</h2>
+  <p class="desc">まだリカバリ手段を持たない最小構成。<b>Rule#0</b> の signer は1つだけ。この鍵を失うと復旧手段がない状態を体験する。</p>
+  <div class="panel">
+    <h3>1. 主パスキーを生成（secp256r1 鍵ペアとして実際に生成）</h3>
+    <div class="row">
+      <button class="act" id="l0-gen">パスキーを生成</button>
+      <span class="mono" id="l0-out">未生成</span>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Rule#0 の現在の構成</h3>
+    <div class="rulebox">
+      <div class="rule-head">Rule#0 <span style="opacity:.6">Default</span></div>
+      <div class="rule-row"><span class="rule-k">signers</span><span class="rule-v sig" id="l0-rule-signers">[ ]</span></div>
+      <div class="rule-row"><span class="rule-k">policies</span><span class="rule-v pol">[ ]</span></div>
+    </div>
+    <div class="note"><b>弱点：</b>この鍵を紛失した瞬間、アカウントに二度とアクセスできない。次のレベルで保険を足す。</div>
+  </div>
+  <div class="footer-nav"><span></span><button class="act ghost" onclick="goLevel(1)">次へ：L1 バックアップ鍵 →</button></div>
+</section>
+
+<!-- L1 -->
+<section class="level" data-level="1">
+  <div class="tag">Level 1</div>
+  <h2>バックアップ鍵（ふっかつのじゅもん）</h2>
+  <p class="desc">高エントロピーな乱数から「じゅもん」を生成し、そこから導出した鍵を Rule#0 に追加する。<b>運営はこの単語列を一度も見ない。</b></p>
+  <div class="panel">
+    <h3>1. 128bitのエントロピーを生成し、単語列にエンコード</h3>
+    <div class="row"><button class="act" id="l1-gen">じゅもんを発行する</button></div>
+    <div class="wordbox" id="l1-words">まだ発行されていません</div>
+  </div>
+  <div class="panel">
+    <h3>2. じゅもんから鍵ペアを導出し、Rule#0 に追加</h3>
+    <div class="row"><button class="act" id="l1-add" disabled>Rule#0 に追加する</button></div>
+    <span class="mono" id="l1-out"></span>
+  </div>
+  <div class="panel">
+    <h3>Rule#0 の現在の構成</h3>
+    <div class="rulebox">
+      <div class="rule-head">Rule#0 <span style="opacity:.6">Default</span></div>
+      <div class="rule-row"><span class="rule-k">signers</span><span class="rule-v sig" id="l1-rule-signers">-</span></div>
+      <div class="rule-row"><span class="rule-k">policies</span><span class="rule-v pol">[ ]</span></div>
+    </div>
+    <div class="note"><b>運用は完全にユーザー任せ：</b>この単語列はサーバーに送らず、紙などにオフライン保管する前提。紛失すれば意味がない。</div>
+  </div>
+  <div class="footer-nav"><button class="act ghost" onclick="goLevel(0)">← L0</button><button class="act ghost" onclick="goLevel(2)">次へ：L2 マルチデバイス →</button></div>
+</section>
+
+<!-- L2 -->
+<section class="level" data-level="2">
+  <div class="tag">Level 2</div>
+  <h2>マルチデバイス（ペアリング）</h2>
+  <p class="desc">ECDHで共有鍵を導出し、両端末に同じ確認コード（SAS）を表示して一致を目視確認する。中継役は暗号化ペイロードしか扱わない想定。</p>
+  <div class="panel">
+    <div class="row">
+      <div style="flex:1;min-width:240px">
+        <h3>端末A（既存端末）</h3>
+        <button class="act" id="l2-a-gen">Ephemeral鍵を生成</button>
+        <div class="mono" id="l2-a-out" style="margin-top:8px"></div>
+      </div>
+      <div style="flex:1;min-width:240px">
+        <h3>端末B（新端末）</h3>
+        <button class="act ghost" id="l2-b-gen" disabled>QRを読み取り、鍵を生成</button>
+        <div class="mono" id="l2-b-out" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+  <div class="panel" id="l2-sas-panel" style="display:none">
+    <h3>両端末に表示される確認コード（SAS）</h3>
+    <div class="row">
+      <div class="timer" id="l2-sas-a">----</div>
+      <div class="timer" id="l2-sas-b">----</div>
+    </div>
+    <div class="row">
+      <button class="act" id="l2-confirm">一致を確認し、signer として追加</button>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Rule#0 の現在の構成</h3>
+    <div class="rulebox">
+      <div class="rule-head">Rule#0 <span style="opacity:.6">Default</span></div>
+      <div class="rule-row"><span class="rule-k">signers</span><span class="rule-v sig" id="l2-rule-signers">-</span></div>
+      <div class="rule-row"><span class="rule-k">policies</span><span class="rule-v pol">[ ]</span></div>
+    </div>
+  </div>
+  <div class="footer-nav"><button class="act ghost" onclick="goLevel(1)">← L1</button><button class="act ghost" onclick="goLevel(3)">次へ：L3 友人ガーディアン →</button></div>
+</section>
+
+<!-- L3 -->
+<section class="level" data-level="3">
+  <div class="tag">Level 3</div>
+  <h2>友人ガーディアン（自己主権リカバリ）</h2>
+  <p class="desc">運営を介さず、信頼する第三者3人によるM-of-N合議でRule#0のsignerを差し替える。しきい値を動かして挙動を確認する。</p>
+  <div class="panel">
+    <h3>1. ガーディアンを3人生成</h3>
+    <div class="row"><button class="act" id="l3-gen">G1・G2・G3 を生成</button></div>
+    <div class="guardian-list" id="l3-guardians"></div>
+  </div>
+  <div class="panel">
+    <h3>2. しきい値を設定</h3>
+    <div class="row">
+      <label class="mono">Threshold(<span id="l3-threshold-val">2</span> of 3)</label>
+      <input type="range" min="1" max="3" value="2" id="l3-threshold">
+    </div>
+  </div>
+  <div class="panel">
+    <h3>3. リカバリを模擬実行（承認するガーディアンをクリック）</h3>
+    <div class="row" id="l3-status"><span class="badge pending">未成立</span></div>
+    <div class="row"><button class="act" id="l3-execute" disabled>Rule#0 のsigner差し替えを実行</button></div>
+  </div>
+  <div class="note"><b>弱点：</b>信頼できる第三者を3人集める負担がユーザー側にある。技術に明るい上級者向け。</div>
+  <div class="footer-nav"><button class="act ghost" onclick="goLevel(2)">← L2</button><button class="act ghost" onclick="goLevel(4)">次へ：L4 運営ガーディアン →</button></div>
+</section>
+
+<!-- L4 -->
+<section class="level" data-level="4">
+  <div class="tag">Level 4</div>
+  <h2>運営ガーディアン（所持証明型・個人情報ゼロ）</h2>
+  <p class="desc">秘密 S のハッシュだけを運営に登録し、依頼時は S 自体（またはその照合）で所持を証明する。氏名・連絡先は一切扱わない。承認後はタイムロック＋拒否権付き。</p>
+
+  <div class="panel">
+    <h3>事前登録フェーズ（平常時）</h3>
+    <div class="row"><button class="act" id="l4-gen-secret">秘密 S を生成</button></div>
+    <div class="wordbox" id="l4-secret-out">まだ発行されていません</div>
+    <div class="row" style="margin-top:10px">
+      <span class="mono">運営サーバーが保存する値： <b id="l4-commit-out">-</b></span>
+    </div>
+    <div class="note"><b>運営はSの値を一度も受け取らない。</b>保存するのは hash(S || contractId) のみ。</div>
+  </div>
+
+  <div class="panel">
+    <h3>依頼フェーズ（S を提示して所持証明）</h3>
+    <div class="row">
+      <input type="text" id="l4-input-secret" placeholder="S を貼り付け（漏れた/正しい、両方試してみてください）">
+      <button class="act" id="l4-verify" disabled>照合する</button>
+    </div>
+    <div id="l4-verify-result"></div>
+  </div>
+
+  <div class="panel" id="l4-timelock-panel" style="display:none">
+    <h3>社内2名承認 → 72h待機（デモでは20秒に短縮）</h3>
+    <div class="row" id="l4-status"><span class="badge pending">pending_recovery</span></div>
+    <div class="timer" id="l4-timer">20.0s</div>
+    <div class="progress"><div class="progress-bar" id="l4-progress" style="width:100%"></div></div>
+    <div class="row">
+      <button class="act danger" id="l4-cancel">本人としてキャンセルする</button>
+    </div>
+  </div>
+
+  <div class="log" id="l4-log"></div>
+
+  <div class="footer-nav"><button class="act ghost" onclick="goLevel(3)">← L3</button><button class="act ghost" onclick="goLevel(5)">次へ：L5 ZK証明 →</button></div>
+</section>
+
+<!-- L5 -->
+<section class="level" data-level="5">
+  <div class="tag">Level 5 · 概念デモ</div>
+  <h2>運営ガーディアン＋ZK証明（最上級）</h2>
+  <p class="desc">L4の「Sそのものを提示する」照合を、「Sを知っていることの証明」に置き換える。この環境ではZK証明ライブラリを実行できないため、<b>概念の対比のみ</b>を示す。</p>
+
+  <div class="panel">
+    <h3>L4（所持証明型）と L5（ZK証明型）の対比</h3>
+    <div class="row" style="align-items:stretch">
+      <div style="flex:1;min-width:260px" class="rulebox">
+        <div class="rule-head">L4：ハッシュ照合</div>
+        <div class="rule-row"><span class="rule-k">送信物</span><span class="rule-v">S そのもの</span></div>
+        <div class="rule-row"><span class="rule-k">運営の処理</span><span class="rule-v">hash(S)を計算し照合</span></div>
+        <div class="rule-row"><span class="rule-k">露出</span><span class="rule-v" style="color:var(--warn)">通信経路上でSが一度は運営ネットワークを通過</span></div>
+      </div>
+      <div style="flex:1;min-width:260px" class="rulebox">
+        <div class="rule-head">L5：ZK証明</div>
+        <div class="rule-row"><span class="rule-k">送信物</span><span class="rule-v">証明 π（Sを含まない）</span></div>
+        <div class="rule-row"><span class="rule-k">運営の処理</span><span class="rule-v">πを検証するのみ</span></div>
+        <div class="rule-row"><span class="rule-k">露出</span><span class="rule-v" style="color:var(--ok)">Sの値は運営ネットワークを一度も通過しない</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <button class="act" id="l5-toy">トイ・デモ：コミットメントの一致だけを見せる（実際のZK証明ではない）</button>
+    <div class="mono" id="l5-out" style="margin-top:10px"></div>
+    <div class="note"><b>実装コスト最大：</b>commit-reveal（Poseidon hashing）・回路の検証・監査が必要。既存のロードマップにある匿名SBT attestation技術の転用を想定。初期リリースでは過剰投資になりやすい。</div>
+  </div>
+
+  <div class="footer-nav"><button class="act ghost" onclick="goLevel(4)">← L4</button><span></span></div>
+</section>
+
+</div>
+
+<script>
+// ─── util ───────────────────────────────────────────────
+const buf2hex = (buf) => Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+const shortHex = (hex, n=8) => hex.length<=n*2 ? hex : `${hex.slice(0,n)}…${hex.slice(-n)}`;
+async function sha256(str){
+  const enc = new TextEncoder().encode(str);
+  const digest = await crypto.subtle.digest('SHA-256', enc);
+  return buf2hex(digest);
+}
+async function genECDSAKeyPair(){
+  const kp = await crypto.subtle.generateKey({name:'ECDSA', namedCurve:'P-256'}, true, ['sign','verify']);
+  const pub = await crypto.subtle.exportKey('raw', kp.publicKey);
+  return { keyPair: kp, publicKeyHex: buf2hex(pub) };
+}
+
+const WORDLIST = ['つるぎ','たて','りゅう','もり','いずみ','ほのお','こおり','かぜ','いわ','ひかり','やみ','つき','たいよう','ほし','しろ','とう','はし','かね','いと','はな','くも','あめ','ゆき','かみなり','うみ','やま','たに','みずうみ','しま','はやし','いし','すな'];
+function entropyToWords(bytes){
+  return Array.from(bytes).map(b => WORDLIST[b % WORDLIST.length]);
+}
+
+// ─── level nav ──────────────────────────────────────────
+const LEVELS = ['L0 単独パスキー','L1 バックアップ鍵','L2 マルチデバイス','L3 友人ガーディアン','L4 運営ガーディアン','L5 ZK証明'];
+let currentLevel = 0;
+const state = {
+  l0: { passkey: null },
+  l1: { words: null, keyHex: null },
+  l2: { aKeyPair:null, bKeyPair:null, sas:null, paired:false },
+  l3: { guardians: [], threshold: 2, approvals: {} },
+  l4: { secret:null, commit:null, verified:false, timelockActive:false, timer:null, remaining:20 }
+};
+
+function renderNav(){
+  const nav = document.getElementById('levelnav');
+  nav.innerHTML = '';
+  LEVELS.forEach((label, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'lbtn' + (i===currentLevel ? ' active' : '') + (isDone(i) ? ' done' : '');
+    btn.textContent = label;
+    btn.onclick = () => goLevel(i);
+    nav.appendChild(btn);
+  });
+}
+function isDone(i){
+  if(i===0) return !!state.l0.passkey;
+  if(i===1) return !!state.l1.keyHex;
+  if(i===2) return state.l2.paired;
+  if(i===3) return Object.keys(state.l3.approvals).length>0 && document.getElementById('l3-execute') && !document.getElementById('l3-execute').disabled;
+  if(i===4) return state.l4.verified;
+  return false;
+}
+function goLevel(i){
+  currentLevel = i;
+  document.querySelectorAll('section.level').forEach(s => s.classList.toggle('active', +s.dataset.level === i));
+  renderNav();
+  renderStateBar();
+}
+function renderStateBar(){
+  const bar = document.getElementById('statebar');
+  const r0 = ['主パスキー' + (state.l0.passkey?'':'(未生成)')];
+  if(state.l1.keyHex) r0.push('バックアップ鍵');
+  if(state.l2.paired) r0.push('端末B');
+  bar.innerHTML = `
+    <span><b>Rule#0</b> <span class="pill">${r0.join(' + ')}</span></span>
+    <span><b>Rule#Recovery</b> <span class="pill">${state.l3.guardians.length ? 'G1,G2,G3 (Threshold '+state.l3.threshold+')' : '未設定'}</span></span>
+    <span><b>運営ガーディアン</b> <span class="pill">${state.l4.verified ? '所持証明 成立' : '未実行'}</span></span>
+  `;
+}
+
+// ─── L0 ─────────────────────────────────────────────────
+document.getElementById('l0-gen').onclick = async () => {
+  const {publicKeyHex} = await genECDSAKeyPair();
+  state.l0.passkey = publicKeyHex;
+  document.getElementById('l0-out').textContent = '生成済み: ' + shortHex(publicKeyHex);
+  document.getElementById('l0-rule-signers').textContent = `[ 主パスキー(${shortHex(publicKeyHex,4)}) ]`;
+  renderNav(); renderStateBar();
+};
+
+// ─── L1 ─────────────────────────────────────────────────
+document.getElementById('l1-gen').onclick = () => {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const words = entropyToWords(bytes);
+  state.l1.words = words;
+  document.getElementById('l1-words').innerHTML = words.map(w=>`<span>${w}</span>`).join('');
+  document.getElementById('l1-add').disabled = false;
+};
+document.getElementById('l1-add').onclick = async () => {
+  const {publicKeyHex} = await genECDSAKeyPair();
+  state.l1.keyHex = publicKeyHex;
+  document.getElementById('l1-out').textContent = '導出鍵: ' + shortHex(publicKeyHex);
+  document.getElementById('l1-rule-signers').innerHTML =
+    `[ 主パスキー(${state.l0.passkey?shortHex(state.l0.passkey,4):'未生成'}), <b>バックアップ鍵(${shortHex(publicKeyHex,4)})</b> ]`;
+  renderNav(); renderStateBar();
+};
+
+// ─── L2 ─────────────────────────────────────────────────
+document.getElementById('l2-a-gen').onclick = async () => {
+  const kp = await crypto.subtle.generateKey({name:'ECDH', namedCurve:'P-256'}, true, ['deriveBits']);
+  state.l2.aKeyPair = kp;
+  const pub = buf2hex(await crypto.subtle.exportKey('raw', kp.publicKey));
+  document.getElementById('l2-a-out').textContent = 'Ephemeral公開鍵: ' + shortHex(pub) + ' → QR表示中';
+  document.getElementById('l2-b-gen').disabled = false;
+};
+document.getElementById('l2-b-gen').onclick = async () => {
+  const kp = await crypto.subtle.generateKey({name:'ECDH', namedCurve:'P-256'}, true, ['deriveBits']);
+  state.l2.bKeyPair = kp;
+  const pub = buf2hex(await crypto.subtle.exportKey('raw', kp.publicKey));
+  document.getElementById('l2-b-out').textContent = 'Ephemeral公開鍵: ' + shortHex(pub) + ' → ECDH計算中';
+
+  const sharedBits = await crypto.subtle.deriveBits(
+    {name:'ECDH', public: state.l2.aKeyPair.publicKey}, kp.privateKey, 256
+  );
+  const sasHash = await sha256(buf2hex(sharedBits));
+  const sasCode = (parseInt(sasHash.slice(0,6), 16) % 1000000).toString().padStart(6,'0');
+  state.l2.sas = sasCode;
+  document.getElementById('l2-sas-panel').style.display = 'block';
+  document.getElementById('l2-sas-a').textContent = sasCode;
+  document.getElementById('l2-sas-b').textContent = sasCode;
+};
+document.getElementById('l2-confirm').onclick = () => {
+  state.l2.paired = true;
+  document.getElementById('l2-rule-signers').innerHTML =
+    `[ 主パスキー, バックアップ鍵, <b>端末Bパスキー(SAS確認済)</b> ]`;
+  renderNav(); renderStateBar();
+};
+
+// ─── L3 ─────────────────────────────────────────────────
+document.getElementById('l3-gen').onclick = async () => {
+  state.l3.guardians = [];
+  for(let i=0;i<3;i++){
+    const {publicKeyHex} = await genECDSAKeyPair();
+    state.l3.guardians.push({ id:'G'+(i+1), key: publicKeyHex });
+  }
+  state.l3.approvals = {};
+  const list = document.getElementById('l3-guardians');
+  list.innerHTML = '';
+  state.l3.guardians.forEach(g => {
+    const card = document.createElement('div');
+    card.className = 'gcard';
+    card.innerHTML = `<span class="dot"></span>${g.id} (${shortHex(g.key,4)})`;
+    card.onclick = () => {
+      state.l3.approvals[g.id] = !state.l3.approvals[g.id];
+      card.classList.toggle('checked', state.l3.approvals[g.id]);
+      updateL3Status();
+    };
+    list.appendChild(card);
+  });
+  updateL3Status();
+};
+document.getElementById('l3-threshold').oninput = (e) => {
+  state.l3.threshold = +e.target.value;
+  document.getElementById('l3-threshold-val').textContent = state.l3.threshold;
+  updateL3Status();
+};
+function updateL3Status(){
+  const approved = Object.values(state.l3.approvals).filter(Boolean).length;
+  const met = approved >= state.l3.threshold && state.l3.guardians.length>0;
+  document.getElementById('l3-status').innerHTML =
+    `<span class="badge ${met?'':'pending'}">${approved} / ${state.l3.threshold} 承認 ${met?'— しきい値成立':'— 未成立'}</span>`;
+  document.getElementById('l3-execute').disabled = !met;
+  renderNav();
+}
+document.getElementById('l3-execute').onclick = () => {
+  alert('Rule#0のsignerを新しいパスキーに差し替えました（シミュレーション）');
+  renderStateBar();
+};
+
+// ─── L4 ─────────────────────────────────────────────────
+const contractIdDemo = 'CDEMOACCOUNT000000000000000000000000000000000000000000000';
+document.getElementById('l4-gen-secret').onclick = () => {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const words = entropyToWords(bytes);
+  const secret = words.join('-');
+  state.l4.secret = secret;
+  document.getElementById('l4-secret-out').innerHTML = words.map(w=>`<span>${w}</span>`).join('');
+  sha256(secret + '||' + contractIdDemo).then(hash => {
+    state.l4.commit = hash;
+    document.getElementById('l4-commit-out').textContent = shortHex(hash, 10);
+    document.getElementById('l4-verify').disabled = false;
+  });
+};
+document.getElementById('l4-verify').onclick = async () => {
+  const input = document.getElementById('l4-input-secret').value.trim();
+  const hash = await sha256(input + '||' + contractIdDemo);
+  const resultEl = document.getElementById('l4-verify-result');
+  const log = document.getElementById('l4-log');
+  if(hash === state.l4.commit){
+    resultEl.innerHTML = '<span class="badge">所持証明 成立</span>';
+    log.innerHTML += `<div class="ok">[OK] ハッシュ一致 → 社内2名承認へ（デモでは自動承認）</div>`;
+    startTimelock();
+  } else {
+    resultEl.innerHTML = '<span class="badge danger">不一致</span>';
+    log.innerHTML += `<div class="warn">[NG] ハッシュ不一致 → 却下</div>`;
+  }
+  log.scrollTop = log.scrollHeight;
+};
+function startTimelock(){
+  state.l4.timelockActive = true;
+  state.l4.remaining = 20;
+  document.getElementById('l4-timelock-panel').style.display = 'block';
+  document.getElementById('l4-status').innerHTML = '<span class="badge pending">pending_recovery（72h相当 → デモでは20秒）</span>';
+  clearInterval(state.l4.timer);
+  state.l4.timer = setInterval(() => {
+    state.l4.remaining -= 0.2;
+    if(state.l4.remaining <= 0){
+      clearInterval(state.l4.timer);
+      document.getElementById('l4-timer').textContent = '0.0s';
+      document.getElementById('l4-progress').style.width = '0%';
+      document.getElementById('l4-status').innerHTML = '<span class="badge">確定 — Rule#0のsigner差し替えを実行</span>';
+      document.getElementById('l4-log').innerHTML += '<div class="ok">[OK] タイムロック満了、キャンセルなし → 確定</div>';
+      state.l4.verified = true;
+      renderNav(); renderStateBar();
+      return;
+    }
+    document.getElementById('l4-timer').textContent = state.l4.remaining.toFixed(1) + 's';
+    document.getElementById('l4-progress').style.width = (state.l4.remaining/20*100) + '%';
+  }, 200);
+}
+document.getElementById('l4-cancel').onclick = () => {
+  clearInterval(state.l4.timer);
+  document.getElementById('l4-status').innerHTML = '<span class="badge danger">本人によりキャンセルされました</span>';
+  document.getElementById('l4-log').innerHTML += '<div class="warn">[CANCEL] 本人の既存パスキーでキャンセル操作 → リカバリ中断</div>';
+};
+
+// ─── L5 ─────────────────────────────────────────────────
+document.getElementById('l5-toy').onclick = async () => {
+  const s = state.l4.secret || 'つるぎ-たて-りゅう';
+  // トイデモ：Sの値を送らず、コミットメントの一致だけを示す簡易表現
+  const commitment = await sha256(s + '::salt');
+  const proofLike = await sha256(commitment + '::challenge-response');
+  document.getElementById('l5-out').innerHTML =
+    `<div>クライアント内部でのみ計算: commitment = ${shortHex(commitment,8)}</div>` +
+    `<div>運営に送るもの（πの代替表現）: ${shortHex(proofLike,8)}</div>` +
+    `<div style="color:var(--ok);margin-top:6px">→ 元のS「${s.split('-')[0]}...」の値自体はこの文字列から復元できない</div>`;
+};
+
+// init
+renderNav();
+renderStateBar();
+goLevel(0);
+</script>
+</body>
+</html>

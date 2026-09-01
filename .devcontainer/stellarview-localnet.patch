@@ -1,0 +1,176 @@
+diff --git a/apps/explorer-web/next.config.ts b/apps/explorer-web/next.config.ts
+index f6fc8fa..6d2664d 100644
+--- a/apps/explorer-web/next.config.ts
++++ b/apps/explorer-web/next.config.ts
+@@ -9,6 +9,9 @@ const withAnalyzer = withBundleAnalyzer({ enabled: process.env.ANALYZE === "true
+ const LOCALES = ["en", "es", "pt", "fr", "de", "zh", "ja", "ko", "it"];
+ 
+ const nextConfig: NextConfig = {
++  async rewrites() {
++    return [{ source: "/api/localnet/:path*", destination: "http://stellar-localnet:8000/:path*" }];
++  },
+   async redirects() {
+     return LOCALES.flatMap((locale) => [
+       {
+diff --git a/apps/explorer-web/src/components/accounts/account-statement.tsx b/apps/explorer-web/src/components/accounts/account-statement.tsx
+index ac3beac..0cd01e3 100644
+--- a/apps/explorer-web/src/components/accounts/account-statement.tsx
++++ b/apps/explorer-web/src/components/accounts/account-statement.tsx
+@@ -39,7 +39,7 @@ async function fetchOperationsForAccount(
+   network: string,
+   daysBack: number
+ ): Promise<StatementRow[]> {
+-  const horizon = getHorizonClient(network as "mainnet" | "testnet" | "futurenet");
++  const horizon = getHorizonClient(network as "mainnet" | "testnet" | "futurenet" | "localnet");
+   const cutoffDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+   const rows: StatementRow[] = [];
+ 
+diff --git a/apps/explorer-web/src/components/common/network-badge.tsx b/apps/explorer-web/src/components/common/network-badge.tsx
+index ab6bc38..38cc8a2 100644
+--- a/apps/explorer-web/src/components/common/network-badge.tsx
++++ b/apps/explorer-web/src/components/common/network-badge.tsx
+@@ -14,12 +14,14 @@ const networkStyles: Record<NetworkKey, string> = {
+   mainnet: "bg-success/15 text-success border-success/25",
+   testnet: "bg-warning/15 text-warning border-warning/25",
+   futurenet: "bg-primary/15 text-primary border-primary/25",
++  localnet: "bg-secondary/15 text-secondary border-secondary/25",
+ };
+ 
+ const networkLabelKeys: Record<NetworkKey, "mainnet" | "testnet" | "futurenet"> = {
+   mainnet: "mainnet",
+   testnet: "testnet",
+   futurenet: "futurenet",
++  localnet: "mainnet",
+ };
+ 
+ export function NetworkBadge({ network, className }: NetworkBadgeProps) {
+@@ -27,7 +29,7 @@ export function NetworkBadge({ network, className }: NetworkBadgeProps) {
+ 
+   return (
+     <Badge variant="outline" className={cn(networkStyles[network], "font-medium", className)}>
+-      {t(networkLabelKeys[network])}
++      {network === "localnet" ? "Localnet" : t(networkLabelKeys[network])}
+     </Badge>
+   );
+ }
+diff --git a/apps/explorer-web/src/components/layout/network-selector.tsx b/apps/explorer-web/src/components/layout/network-selector.tsx
+index c84a83a..0a5dbcd 100644
+--- a/apps/explorer-web/src/components/layout/network-selector.tsx
++++ b/apps/explorer-web/src/components/layout/network-selector.tsx
+@@ -1,6 +1,6 @@
+ "use client";
+ 
+-import { Check, ChevronDown, Globe, TestTube, Rocket } from "lucide-react";
++import { Check, ChevronDown, Globe, Monitor, Rocket, TestTube } from "lucide-react";
+ import { Button } from "@/components/ui/button";
+ import {
+   DropdownMenu,
+@@ -17,12 +17,14 @@ const networkIcons: Record<NetworkKey, typeof Globe> = {
+   mainnet: Globe,
+   testnet: TestTube,
+   futurenet: Rocket,
++  localnet: Monitor,
+ };
+ 
+ const networkColors: Record<NetworkKey, string> = {
+   mainnet: "text-success",
+   testnet: "text-warning",
+   futurenet: "text-primary",
++  localnet: "text-secondary",
+ };
+ 
+ export function NetworkSelector() {
+diff --git a/apps/explorer-web/src/i18n/navigation.tsx b/apps/explorer-web/src/i18n/navigation.tsx
+index a3844dd..198086b 100644
+--- a/apps/explorer-web/src/i18n/navigation.tsx
++++ b/apps/explorer-web/src/i18n/navigation.tsx
+@@ -5,7 +5,7 @@ import { locales, defaultLocale } from "./config";
+ import { useParams } from "next/navigation";
+ import { forwardRef, type ComponentProps } from "react";
+ 
+-const VALID_NETWORKS = ["mainnet", "testnet", "futurenet"] as const;
++const VALID_NETWORKS = ["mainnet", "testnet", "futurenet", "localnet"] as const;
+ 
+ const nav = createNavigation({ locales, defaultLocale });
+ 
+diff --git a/apps/explorer-web/src/lib/constants/networks.ts b/apps/explorer-web/src/lib/constants/networks.ts
+index 65df09b..d1ccf2a 100644
+--- a/apps/explorer-web/src/lib/constants/networks.ts
++++ b/apps/explorer-web/src/lib/constants/networks.ts
+@@ -1,5 +1,10 @@
+ import type { NetworkConfig, NetworkKey } from "@/types";
+ 
++const localnetBaseUrl =
++  typeof window === "undefined"
++    ? "http://stellar-localnet:8000"
++    : `${window.location.origin}/api/localnet`;
++
+ export const NETWORKS: Record<NetworkKey, NetworkConfig> = {
+   mainnet: {
+     name: "Mainnet",
+@@ -19,6 +24,12 @@ export const NETWORKS: Record<NetworkKey, NetworkConfig> = {
+     rpcUrl: "https://rpc-futurenet.stellar.org",
+     passphrase: "Test SDF Future Network ; October 2022",
+   },
++  localnet: {
++    name: "Localnet",
++    horizonUrl: localnetBaseUrl,
++    rpcUrl: `${localnetBaseUrl}/rpc`,
++    passphrase: "Standalone Network ; February 2017",
++  },
+ } as const;
+ 
+ export const DEFAULT_NETWORK: NetworkKey = "mainnet";
+@@ -29,4 +40,5 @@ export const NETWORK_COLORS: Record<NetworkKey, string> = {
+   mainnet: "bg-success text-success-foreground",
+   testnet: "bg-warning text-warning-foreground",
+   futurenet: "bg-primary text-primary-foreground",
++  localnet: "bg-secondary text-secondary-foreground",
+ };
+diff --git a/apps/explorer-web/src/lib/stellar/client.ts b/apps/explorer-web/src/lib/stellar/client.ts
+index c05f38b..355ea35 100644
+--- a/apps/explorer-web/src/lib/stellar/client.ts
++++ b/apps/explorer-web/src/lib/stellar/client.ts
+@@ -4,7 +4,7 @@ import type { NetworkKey } from "@/types";
+ 
+ export type StellarExpertResult<T> =
+   | { available: true; data: T }
+-  | { available: false; reason: "testnet" | "futurenet" | "error" };
++  | { available: false; reason: "testnet" | "futurenet" | "localnet" | "error" };
+ 
+ export interface StellarClients {
+   horizon: Horizon.Server;
+@@ -18,9 +18,10 @@ export function createStellarClient(network: NetworkKey): StellarClients {
+   if (cached) return cached;
+ 
+   const config = NETWORKS[network];
++  const allowHttp = network === "localnet";
+   const clients: StellarClients = {
+-    horizon: new Horizon.Server(config.horizonUrl),
+-    rpc: new rpc.Server(config.rpcUrl),
++    horizon: new Horizon.Server(config.horizonUrl, { allowHttp }),
++    rpc: new rpc.Server(config.rpcUrl, { allowHttp }),
+   };
+ 
+   clientCache.set(network, clients);
+@@ -41,6 +42,7 @@ export async function fetchStellarExpert<T>(
+ ): Promise<StellarExpertResult<T>> {
+   if (network === "testnet") return { available: false, reason: "testnet" };
+   if (network === "futurenet") return { available: false, reason: "futurenet" };
++  if (network === "localnet") return { available: false, reason: "localnet" };
+ 
+   try {
+     // Stellar Expert API uses "public" as the network slug, not "mainnet"
+diff --git a/apps/explorer-web/src/types/index.ts b/apps/explorer-web/src/types/index.ts
+index 25f6287..51b8648 100644
+--- a/apps/explorer-web/src/types/index.ts
++++ b/apps/explorer-web/src/types/index.ts
+@@ -1,7 +1,7 @@
+ export * from "./stellar";
+ 
+ // Network types
+-export type NetworkKey = "mainnet" | "testnet" | "futurenet";
++export type NetworkKey = "mainnet" | "testnet" | "futurenet" | "localnet";
+ 
+ export interface NetworkConfig {
+   name: string;

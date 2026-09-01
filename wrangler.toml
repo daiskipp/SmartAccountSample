@@ -1,0 +1,45 @@
+name = "account-sample-api"
+main = "build/worker/shim.mjs"
+compatibility_date = "2026-08-24"
+compatibility_flags = ["nodejs_compat"]
+
+[build]
+# `strip = true` in the workspace's [profile.release] (Cargo.toml) makes
+# wasm-bindgen's release-mode codegen fail ("externref table required for
+# catch wrappers") -- it removes custom sections wasm-bindgen's CLI needs.
+# worker-build's own wasm-opt pass already strips/shrinks the output, so
+# disabling Cargo's strip here costs nothing. This does not affect the
+# native binary's release profile (that build never sets this env var).
+command = "CARGO_PROFILE_RELEASE_STRIP=false worker-build --release"
+
+# A single Durable Object instance ("global", see src/worker.rs) holds the
+# whole deployment's recovery Store -- the same single-process semantics as
+# the native binary's in-memory `Arc<Mutex<Store>>`, just backed by the
+# Workers Free-plan-eligible SQLite storage backend instead of a SQLite file.
+[[durable_objects.bindings]]
+name = "RECOVERY_STORE"
+class_name = "RecoveryStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RecoveryStore"]
+
+# Public, non-secret configuration. Set `RELAY_CHANNELS_API_KEY` separately
+# with `wrangler secret put RELAY_CHANNELS_API_KEY` -- never put it here.
+[vars]
+RELAY_CHANNELS_URL = "https://channels.openzeppelin.com/testnet"
+RELAY_NETWORK_PASSPHRASE = "Test SDF Network ; September 2015"
+# The frontend's exact Cloudflare Pages origin. Must match the deployed
+# Pages project's URL (see docs/dev/testnet-deployment.md and README.md);
+# CORS on /api/relay rejects every other origin.
+RELAY_ALLOWED_ORIGIN = "https://account-sample-verify.pages.dev"
+# smart-account-kit's shared, deterministic default deployer -- the same
+# address on every network (derived from a fixed seed, not from chain
+# state). See node_modules/smart-account-kit/dist/utils.js.
+RELAY_WALLET_ROOTS = "GAAH4OT36RRCCAGKARGPN2HLHT2NOBVFHO4GUHA6CF7UKQ4MMV24WQ4N"
+RELAY_FUNCTIONS = ""
+# Testnet Smart Account WASM hash from docs/dev/testnet-deployment.md
+# (2026-08-24 deployment). Redeploy and update both values together if the
+# contract is ever redeployed.
+RELAY_WASM_HASHES = "070ef5dd25f681f092e171b9381444fec7a1d93737272cc57e67c232e048b366"
+RELAY_MANAGED_ACCOUNT_WASM_HASHES = "070ef5dd25f681f092e171b9381444fec7a1d93737272cc57e67c232e048b366"

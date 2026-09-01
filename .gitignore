@@ -1,0 +1,29 @@
+# Build artifacts
+**/target
+/node_modules
+frontend/node_modules
+frontend/dist
+/.pnpm-store
+# worker-build output (wrangler.toml) and wrangler's local dev/deploy state
+/build
+.wrangler/
+
+# Local/machine-specific env overrides (never shared project config)
+frontend/.env.local
+frontend/.env.production.local
+.devcontainer/localnet.env
+.devcontainer/.env
+
+# Test artifacts
+frontend/test-results/
+frontend/playwright-report/
+
+# Editor/OS junk
+.DS_Store
+*.swp
+
+# Local tool checkouts
+tools/stellarview-explorer/
+
+# Claude Code local session/runtime state (machine-local, not project source)
+.claude/

@@ -1,0 +1,14 @@
+{
+  "networks": [
+    {
+      "type": "stellar",
+      "network": "localnet",
+      "rpc_urls": ["http://stellar-localnet:8000/rpc"],
+      "explorer_urls": [],
+      "average_blocktime_ms": 5000,
+      "is_testnet": true,
+      "passphrase": "Standalone Network ; February 2017",
+      "horizon_url": "http://stellar-localnet:8000"
+    }
+  ]
+}

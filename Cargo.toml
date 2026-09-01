@@ -1,0 +1,66 @@
+[package]
+name = "account-sample"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+
+[[bin]]
+name = "account-sample"
+path = "src/main.rs"
+
+[lib]
+name = "account_sample"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# `default-features = false` drops axum's default "tokio" feature, which
+# pulls in tokio's `net`/`rt` (and therefore `mio`) unconditionally -- those
+# don't compile for wasm32. Native-only adds "tokio"/"http1" back below for
+# `axum::serve`; both targets otherwise use axum purely as a `tower::Service`
+# router (Workers dispatches into it directly, no listener needed).
+axum = { version = "0.8", default-features = false, features = ["json"] }
+base64 = "0.22"
+bincode = "1.3"
+ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
+hex = "0.4"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+stellar-strkey = "0.0.16"
+stellar-xdr = "22.1.0"
+subtle = "2.6"
+thiserror = "2"
+# Only the `sync` feature (no reactor/threads) so this compiles unchanged for
+# both the native binary and the Workers/wasm32 target.
+tokio = { version = "1", default-features = false, features = ["sync"] }
+tower-http = { version = "0.6", features = ["cors"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+axum = { version = "0.8", default-features = false, features = ["tokio", "http1"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "macros"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# rand's OsRng needs getrandom's "js" backend to read randomness from the
+# Workers/browser crypto API; without it nonce generation panics at runtime.
+getrandom = { version = "0.2", features = ["js"] }
+worker = { version = "0.8", features = ["http", "axum"] }
+# The `#[durable_object]`/`#[event]` macros expand to code that references
+# `wasm_bindgen::...` directly, so it must be a direct dependency here too
+# (not just pulled in transitively through `worker`).
+wasm-bindgen = "0.2"
+# Needed to name `http::Request`/`http::Response` directly (the shape
+# `worker`'s `http` feature and `axum::Router` speak) and to call the
+# router as a `tower::Service` inside the Durable Object.
+http = "1"
+tower-service = "0.3"
+
+[dev-dependencies]
+tower = "0.5"
+
+[profile.release]
+lto = true
+strip = true
