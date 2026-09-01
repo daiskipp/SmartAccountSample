@@ -125,12 +125,12 @@ platform, behind `#[cfg(target_arch = "wasm32")]`; every route, handler, and the
 `Store` itself are unchanged and shared with the native binary.
 
 ```bash
-sudo apt-get install -y pkg-config libssl-dev   # one-time; worker-build's own build needs these
-cargo install worker-build --locked
-cargo check --target wasm32-unknown-unknown --lib   # type-check the Workers build
-wrangler login
-wrangler secret put RELAY_CHANNELS_API_KEY           # from https://channels.openzeppelin.com/testnet/gen
-wrangler deploy
+cargo install worker-build --locked  # needs pkg-config/libssl-dev, provided by the devcontainer image
+pnpm install                         # one-time; installs wrangler from the root package.json
+cargo check --target wasm32-unknown-unknown --lib  # type-check the Workers build
+pnpm wrangler login
+pnpm wrangler secret put RELAY_CHANNELS_API_KEY      # from https://channels.openzeppelin.com/testnet/gen
+pnpm wrangler deploy
 ```
 
 `wrangler deploy` runs `wrangler.toml`'s `[build].command`, which is

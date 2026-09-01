@@ -7,11 +7,15 @@ ARG TARGETARCH
 # the prebuilt stellar CLI binary (dynamically linked against it). python3
 # gives us a zero-dependency static server for previewing
 # docs/recovery-levels-demo.html (no bundler/build step exists in this repo).
+# pkg-config and libssl-dev are required by `cargo install worker-build`,
+# used for the Cloudflare Workers deployment (see README.md).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
       bubblewrap \
       just \
       libdbus-1-3 \
+      libssl-dev \
+      pkg-config \
       python-is-python3 \
       python3-pip \
       python3-venv \
