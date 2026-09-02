@@ -27,6 +27,7 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
   const [sas, setSas] = useState<string | null>(null);
   const [newDeviceStatus, setNewDeviceStatus] = useState<"waiting" | "success" | "failure" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [joining, setJoining] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -65,7 +66,8 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
   };
 
   const join = async (): Promise<void> => {
-    if (!kit) return;
+    if (!kit || joining) return;
+    setJoining(true);
     try {
       const credential = await kit.credentials.create({ nickname: joinNickname.trim() || "新しい端末" });
       // Only this device can label itself in its own device list; the pairing
@@ -92,6 +94,8 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
       setMessage("2つの端末に表示される6桁が同じか確認してください。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "招待コードを確認してください");
+    } finally {
+      setJoining(false);
     }
   };
 
@@ -114,7 +118,9 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
           <summary className="cursor-pointer">QRを読み取れない場合はコードを貼り付ける</summary>
           <Textarea aria-label="招待コード" value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} rows={4} className="mt-2 font-mono text-xs" />
         </details>
-        <Button disabled={!kit || !inviteCode.trim() || !!newPairing} onClick={() => void join()}>この端末を準備する</Button>
+        <Button disabled={!kit || !inviteCode.trim() || !!newPairing || joining} onClick={() => void join()}>
+          {joining ? "準備しています…" : "この端末を準備する"}
+        </Button>
         {sas && <p aria-label="確認コード" className="text-center text-2xl font-mono tracking-widest"><output>{sas}</output></p>}
         {newDeviceStatus === "waiting" && <p className="text-muted-foreground text-sm">既存の端末での確認を待っています…</p>}
         {newDeviceStatus === "success" && <p className="text-sm">この端末を追加しました。次からこの端末でも開けます。</p>}
