@@ -14,6 +14,7 @@ import { RecoveryEntry } from "./features/recovery/RecoveryEntry";
 import { PhraseRecovery } from "./features/recovery/PhraseRecovery";
 import { GuardianRecoveryExecute } from "./features/recovery/GuardianRecoveryExecute";
 import { GuardianJoin } from "./features/recovery/GuardianJoin";
+import { DeviceJoin } from "./features/recovery/DeviceJoin";
 
 export interface RouterContext {
   kit: SmartAccountKit | null;
@@ -111,6 +112,19 @@ const guardianJoinRoute = createRoute({
   },
 });
 
+const deviceJoinRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/device/join",
+  validateSearch: (search: Record<string, unknown>): { invite?: string } => ({
+    invite: typeof search.invite === "string" ? search.invite : undefined,
+  }),
+  component: () => {
+    const { kit } = deviceJoinRoute.useRouteContext();
+    const { invite } = deviceJoinRoute.useSearch();
+    return <DeviceJoin kit={kit} initialInviteCode={invite} />;
+  },
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -119,6 +133,7 @@ const routeTree = rootRoute.addChildren([
   recoveryPhraseRoute,
   recoveryGuardianRoute,
   guardianJoinRoute,
+  deviceJoinRoute,
 ]);
 
 export const router = createRouter({ routeTree, context: { kit: null, auth: undefined! } });

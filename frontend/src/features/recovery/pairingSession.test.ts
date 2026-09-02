@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { canAddPairedPasskey, confirmExistingPairing, confirmNewPairing, beginPairing, joinPairing } from "./pairingSession";
+import { buildDeviceJoinUrl, canAddPairedPasskey, confirmExistingPairing, confirmNewPairing, beginPairing, extractInviteCode, joinPairing } from "./pairingSession";
 
 describe("pairing session", () => {
   it("does not permit signer addition before the user confirms the matching SAS", () => {
@@ -37,5 +37,15 @@ describe("pairing session", () => {
     expect(relayedPayload).not.toContain("newPublicKey");
     expect(relayedPayload).not.toContain("credential");
     expect(relayedPayload).not.toContain("iPhone");
+  });
+
+  it("builds a join URL a phone's camera can open directly, and extracts the invite code back out of it", () => {
+    const url = buildDeviceJoinUrl("https://example.com", "abc123");
+    expect(url).toBe("https://example.com/device/join?invite=abc123");
+    expect(extractInviteCode(url)).toBe("abc123");
+  });
+
+  it("falls back to treating scanned text as a bare invite code when it is not a URL", () => {
+    expect(extractInviteCode("abc123")).toBe("abc123");
   });
 });

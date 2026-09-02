@@ -92,7 +92,7 @@ export function DeviceManager({ kit, webauthnVerifierAddress }: DeviceManagerPro
     return <Card>
       <CardHeader>
         <CardTitle>もう1台の端末をつなぐ</CardTitle>
-        <CardDescription>QRコードで端末同士をつなぎ、両方の画面に出る6桁が同じか確認します。</CardDescription>
+        <CardDescription>新しい端末のカメラでQRコードを読み取ると追加の画面が開きます。両方の画面に出る6桁が同じか確認してください。</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <Button variant="outline" size="sm" className="self-start" onClick={() => setView("list")}>← 一覧に戻る</Button>

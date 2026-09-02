@@ -135,6 +135,23 @@ export async function pollPairingOutcome(apiBaseUrl: string, pairing: NewPairing
   return getPairingOutcome(apiBaseUrl, pairing.token, fetcher);
 }
 
+/** The QR a host displays now encodes this join URL, so a phone's own camera app can open it directly. */
+export function buildDeviceJoinUrl(origin: string, inviteCode: string): string {
+  return `${origin}/device/join?invite=${inviteCode}`;
+}
+
+/** Accepts either a join URL (scanned by a system camera) or a bare invite code (pasted, or scanned in-app). */
+export function extractInviteCode(scanned: string): string {
+  try {
+    const url = new URL(scanned);
+    const invite = url.searchParams.get("invite");
+    if (invite) return invite;
+  } catch {
+    // not a URL -- treat the scanned text as a bare invite code
+  }
+  return scanned;
+}
+
 function decodeInvite(value: string): Invite {
   const invite = JSON.parse(decoder.decode(fromBase64Url(value))) as Invite;
   if (!invite.token || fromBase64Url(invite.transportKey).length !== 32) throw new Error("ペアリングコードを確認してください");
