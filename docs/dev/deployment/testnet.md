@@ -13,24 +13,20 @@ just testnet-deploy
 
 **The devcontainer's `STELLAR_RPC_URL` / `STELLAR_FRIENDBOT_URL` /
 `STELLAR_NETWORK` / `STELLAR_NETWORK_PASSPHRASE` env vars (set for the
-`stellar-localnet` sibling service's convenience) silently override the
-Stellar CLI's `--network testnet` flag.** With them set, every `stellar`
-invocation in the deploy script — funding, install, deploy — resolves to the
-local Standalone network instead of the public Testnet, but reports success
-either way (the `stellar keys generate --fund` output text is the only
+`stellar-localnet` sibling service's convenience) used to silently override
+the Stellar CLI's `--network testnet` flag.** With them set, every `stellar`
+invocation in the deploy script — funding, install, deploy — resolved to the
+local Standalone network instead of the public Testnet, but reported success
+either way (the `stellar keys generate --fund` output text was the only
 tell: `funded on "Standalone Network ; February 2017"` instead of `"Test SDF
 Network ; September 2015"`). This is exactly how the 2026-09-01 record below
 went unnoticed for a day: nothing on Testnet actually existed at those
 addresses, so every Testnet account creation failed after the passkey step
-with `Could not obtain contract wasm from server`. Always run the deploy
-script with those four vars unset:
-
-```bash
-env -u STELLAR_RPC_URL -u STELLAR_FRIENDBOT_URL -u STELLAR_NETWORK -u STELLAR_NETWORK_PASSPHRASE \
-  just testnet-deploy
-```
-
-and verify the result actually landed on Testnet before trusting it, e.g.:
+with `Could not obtain contract wasm from server`.
+`deploy-testnet-contracts.sh` now `unset`s those four vars itself before its
+first `stellar` invocation, so `just testnet-deploy` is safe to run directly
+without an `env -u` wrapper. Still verify the result actually landed on
+Testnet before trusting it, e.g.:
 
 ```bash
 stellar contract info interface --rpc-url https://soroban-testnet.stellar.org \

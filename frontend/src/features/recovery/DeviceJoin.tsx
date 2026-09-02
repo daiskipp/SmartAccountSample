@@ -24,6 +24,7 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
   const [joinNickname, setJoinNickname] = useState("");
   const [scanning, setScanning] = useState(false);
   const [newPairing, setNewPairing] = useState<NewPairing | null>(null);
+  const [pendingCredential, setPendingCredential] = useState<{ credentialId: string; publicKey: Uint8Array } | null>(null);
   const [sas, setSas] = useState<string | null>(null);
   const [newDeviceStatus, setNewDeviceStatus] = useState<"waiting" | "success" | "failure" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -46,9 +47,22 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
     let stopped = false;
     const timer = setInterval(() => {
       pollPairingOutcome(apiBaseUrl, newPairing)
-        .then((outcome) => {
+        .then(async (outcome) => {
           if (stopped || outcome === null) return;
           clearInterval(timer);
+          // Only save the account association once the signer addition is
+          // confirmed on-chain -- saving it eagerly would leave a local
+          // record pointing at an account this passkey never actually got
+          // added to if the existing device's step fails or is aborted.
+          if (outcome && kit && pendingCredential) {
+            await kit.credentials.save({
+              credentialId: pendingCredential.credentialId,
+              publicKey: pendingCredential.publicKey,
+              contractId: newPairing.accountContractId,
+              isPrimary: false,
+              nickname: joinNickname.trim() || "この端末",
+            });
+          }
           setNewDeviceStatus(outcome ? "success" : "failure");
         })
         .catch(() => {
@@ -58,7 +72,7 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
         });
     }, POLL_INTERVAL_MS);
     return () => { stopped = true; clearInterval(timer); };
-  }, [newPairing, newDeviceStatus]);
+  }, [newPairing, newDeviceStatus, kit, pendingCredential, joinNickname]);
 
   const startScan = (): void => {
     setMessage(null);
@@ -77,17 +91,10 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
         passkey: { credentialId: credential.credentialId, publicKey: credential.publicKey },
         nickname: joinNickname,
       });
-      // Without this, the SDK has no local record of which account this
-      // brand-new passkey belongs to, and a later login falls back to the
-      // address this credential *would* have deployed on its own -- not the
-      // existing account it was actually added to as a signer.
-      await kit.credentials.save({
-        credentialId: credential.credentialId,
-        publicKey: credential.publicKey,
-        contractId: pairing.accountContractId,
-        isPrimary: false,
-        nickname: joinNickname.trim() || "この端末",
-      });
+      // The account association is saved once the polling effect below
+      // confirms the existing device actually added this signer on-chain,
+      // not here -- see that effect's comment.
+      setPendingCredential({ credentialId: credential.credentialId, publicKey: credential.publicKey });
       setNewPairing(pairing);
       setSas(await confirmNewPairing(pairing));
       setNewDeviceStatus("waiting");

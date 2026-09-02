@@ -6,6 +6,15 @@
 # routine reset/bootstrap cycle.
 set -euo pipefail
 
+# The devcontainer sets these for the stellar-localnet sibling service's
+# convenience, but the Stellar CLI lets them silently override --network
+# testnet on every invocation below -- funding, install, deploy all resolve
+# to the local Standalone network instead, while still reporting success.
+# That's exactly how the 2026-09-01 Testnet record went unnoticed for a day
+# (see docs/dev/deployment/testnet.md). Unset them here instead of relying on
+# every caller to remember to.
+unset STELLAR_RPC_URL STELLAR_FRIENDBOT_URL STELLAR_NETWORK STELLAR_NETWORK_PASSPHRASE
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 oz_commit="fbfde388e1b72afa93d6b1c922067879b20e81db"
 work_dir="$(mktemp -d "${TMPDIR:-/tmp}/account-sample-testnet.XXXXXX")"
