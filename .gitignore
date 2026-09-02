@@ -12,6 +12,7 @@ frontend/dist
 frontend/.env.local
 frontend/.env.production.local
 .devcontainer/localnet.env
+.devcontainer/testnet.env
 .devcontainer/.env
 
 # Test artifacts

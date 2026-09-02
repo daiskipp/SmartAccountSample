@@ -63,43 +63,5 @@ secret volumes too, so that fresh channel accounts are funded on the new chain.
 The Vite development certificate is local-only; do not use it for Testnet or
 production.
 
-## Testnet relay gateway configuration
-
-`POST /api/relay` accepts the SDK's fee-sponsored `{ "func", "auth" }` and
-signed `{ "xdr" }` submissions. It decodes the XDR and rejects every request
-except a one-operation Soroban invocation for an allowlisted
-contract/function or shared-deployer `CreateContractV2`, with an allowlisted
-authorization root and WASM hash. Signed envelopes must also contain bounded
-Soroban resource and transaction fees. The backend wraps the accepted payload
-as `{ "params": ... }` for Channels; `RELAY_CHANNELS_API_KEY` therefore
-belongs only to the Axum process, never to `frontend/.env*`.
-
-```dotenv
-RELAY_CHANNELS_URL=https://channels.openzeppelin.com/testnet
-RELAY_CHANNELS_API_KEY=server-only-channels-key
-RELAY_ALLOWED_ORIGIN=https://your-testnet-frontend.example
-RELAY_WALLET_ROOTS=G...,C...
-RELAY_FUNCTIONS=C...:execute,C...:__constructor
-RELAY_WASM_HASHES=lowercase-64-character-wasm-hash
-RELAY_MANAGED_ACCOUNT_WASM_HASHES=lowercase-64-character-smart-account-wasm-hash
-```
-
-All relay variables are required when `RELAY_CHANNELS_URL` is set. CORS permits
-only `RELAY_ALLOWED_ORIGIN`; do not use a wildcard for a fee-sponsored endpoint.
-Keep the lists deployment-specific and minimal. `RELAY_MANAGED_ACCOUNT_WASM_HASHES`
-is the subset of creation hashes that represents this application's Smart
-Account artifact. After Channels confirms one of those creations, its derived
-contract ID is persisted and receives only the fixed recovery-management
-surface (`add_policy`, `add_context_rule`, signer add/remove, and `execute`). This lets a newly
-created account continue into L1--L4 setup without a gateway restart, while
-other allowlisted contract deployments receive no additional relay access. No
-Channels credentials or funded Testnet channel account is committed in this
-repository.
-The operator address is public only; its one-time local development credential
-was deleted after deployment. It cannot perform an operator signature until a
-new local operator credential is created and funded.
-
-The generated TimeDelayPolicy is the current source build and exposes
-`get_pending_for_account`, so the script sets both
-`VITE_TIME_DELAY_POLICY_ADDRESS` and `VITE_TIME_DELAY_POLICY_STATUS_ADDRESS`
-to that deployment.
+For the equivalent Testnet-facing relay configuration (`RELAY_*` environment
+variables), see [`testnet.md`](testnet.md).

@@ -4,6 +4,6 @@
   "version": "0.1.0",
   "description": "Tooling for the Cloudflare Workers deployment of the recovery API (see wrangler.toml).",
   "devDependencies": {
-    "wrangler": "4.127.1"
+    "wrangler": "4.128.0"
   }
 }

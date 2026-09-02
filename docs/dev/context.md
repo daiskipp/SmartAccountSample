@@ -120,7 +120,7 @@ Rust APIは`Result<T, E>`をHTTPエラーへ明示変換する。TypeScriptはsm
   lookup for the unauthenticated wait-status page. Both policies are tested locally
   but still require deployment and an independent audit before release.
   Public Testnet deployments for the account WASM and the verifier/recovery
-  policies are recorded in `docs/dev/testnet-deployment.md`. The Axum gateway
+  policies are recorded in `docs/dev/deployment/testnet.md`. The Axum gateway
   has also created and confirmed a synthetic-credential Testnet Smart Account
   through managed Channels. A confirmed deployment made from the explicitly
   configured Smart Account WASM hash is persisted as a relay wallet root and
