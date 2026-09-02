@@ -31,3 +31,4 @@ tools/stellarview-explorer/
 
 # Claude Code local session/runtime state (machine-local, not project source)
 .claude/
+.tmp/
