@@ -26,10 +26,26 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
   const [newPairing, setNewPairing] = useState<NewPairing | null>(null);
   const [pendingCredential, setPendingCredential] = useState<{ credentialId: string; publicKey: Uint8Array } | null>(null);
   const [sas, setSas] = useState<string | null>(null);
-  const [newDeviceStatus, setNewDeviceStatus] = useState<"waiting" | "success" | "failure" | null>(null);
+  const [newDeviceStatus, setNewDeviceStatus] = useState<"waiting" | "success" | "failure" | "saveFailed" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
+  const [savingRetry, setSavingRetry] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // The on-chain signer addition and the local credential-to-account
+  // association are two separate points of failure; this saves the latter,
+  // reused both right after a confirmed on-chain success and by the retry
+  // button if that save itself fails (e.g. IndexedDB unavailable).
+  const saveCredential = async (): Promise<void> => {
+    if (!kit || !pendingCredential || !newPairing) return;
+    await kit.credentials.save({
+      credentialId: pendingCredential.credentialId,
+      publicKey: pendingCredential.publicKey,
+      contractId: newPairing.accountContractId,
+      isPrimary: false,
+      nickname: joinNickname.trim() || "この端末",
+    });
+  };
 
   useEffect(() => {
     if (!scanning || !videoRef.current) return;
@@ -60,14 +76,17 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
           // confirmed on-chain -- saving it eagerly would leave a local
           // record pointing at an account this passkey never actually got
           // added to if the existing device's step fails or is aborted.
-          if (outcome && kit && pendingCredential) {
-            await kit.credentials.save({
-              credentialId: pendingCredential.credentialId,
-              publicKey: pendingCredential.publicKey,
-              contractId: newPairing.accountContractId,
-              isPrimary: false,
-              nickname: joinNickname.trim() || "この端末",
-            });
+          if (outcome) {
+            try {
+              await saveCredential();
+            } catch {
+              // The on-chain addition genuinely succeeded here -- only the
+              // local bookkeeping failed, so this is distinct from
+              // "failure" and offers a retry of just the save, not the
+              // whole pairing.
+              setNewDeviceStatus("saveFailed");
+              return;
+            }
           }
           setNewDeviceStatus(outcome ? "success" : "failure");
         })
@@ -86,6 +105,19 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
   const startScan = (): void => {
     setMessage(null);
     setScanning(true);
+  };
+
+  const retrySave = async (): Promise<void> => {
+    if (savingRetry) return;
+    setSavingRetry(true);
+    try {
+      await saveCredential();
+      setNewDeviceStatus("success");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "保存できませんでした");
+    } finally {
+      setSavingRetry(false);
+    }
   };
 
   const join = async (): Promise<void> => {
@@ -141,6 +173,14 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
         {newDeviceStatus === "waiting" && <p className="text-muted-foreground text-sm">既存の端末での確認を待っています…</p>}
         {newDeviceStatus === "success" && <p className="text-sm">この端末を追加しました。次からこの端末でも開けます。</p>}
         {newDeviceStatus === "failure" && <p role="alert" className="text-muted-foreground text-sm">追加できませんでした。もう一度やり直してください。</p>}
+        {newDeviceStatus === "saveFailed" && <div className="flex flex-col gap-2">
+          <p role="alert" className="text-muted-foreground text-sm">
+            オンチェーンへの追加は完了しましたが、この端末にログイン情報を保存できませんでした。
+          </p>
+          <Button variant="outline" disabled={savingRetry} onClick={() => void retrySave()}>
+            {savingRetry ? "保存しています…" : "もう一度保存する"}
+          </Button>
+        </div>}
         {message && <p role="alert" className="text-muted-foreground text-sm">{message}</p>}
       </CardContent>
     </Card>
