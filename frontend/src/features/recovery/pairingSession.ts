@@ -24,6 +24,7 @@ const SAS_AAD = encoder.encode("account-sample/l2/sas/v1");
 interface Offer {
   sessionId: string;
   oldPublicKey: string;
+  accountContractId: string;
 }
 
 interface Invite {
@@ -43,6 +44,7 @@ export interface NewPairing {
   keyPair: PairingKeyPair;
   sessionId: string;
   token: string;
+  accountContractId: string;
 }
 
 export interface PairedPasskey {
@@ -66,11 +68,11 @@ export function canAddPairedPasskey(passkey: PairedPasskey | null, sasConfirmed:
   return sasConfirmed && passkey !== null;
 }
 
-export async function beginPairing(apiBaseUrl: string, fetcher: typeof fetch = fetch): Promise<ExistingPairing> {
+export async function beginPairing(apiBaseUrl: string, accountContractId: string, fetcher: typeof fetch = fetch): Promise<ExistingPairing> {
   const keyPair = createPairingKeyPair();
   const transportKey = crypto.getRandomValues(new Uint8Array(32));
   const sessionId = base64Url(crypto.getRandomValues(new Uint8Array(16)));
-  const offer: Offer = { sessionId, oldPublicKey: base64Url(keyPair.publicKey) };
+  const offer: Offer = { sessionId, oldPublicKey: base64Url(keyPair.publicKey), accountContractId };
   const payload = pack(encryptPairingPayload(transportKey, encoder.encode(JSON.stringify(offer)), OFFER_AAD));
   const session = await createPairingSession(apiBaseUrl, payload, fetcher);
   return {
@@ -88,7 +90,7 @@ export async function joinPairing(apiBaseUrl: string, inviteCode: string, option
   const encryptedOffer = await getPairingPayload(apiBaseUrl, invite.token, fetcher);
   const offer = JSON.parse(decoder.decode(decryptPairingPayload(transportKey, unpack(encryptedOffer), OFFER_AAD))) as Offer;
   const existingPublicKey = fromBase64Url(offer.oldPublicKey);
-  if (existingPublicKey.length !== 32 || !offer.sessionId) throw new Error("ペアリングコードを確認してください");
+  if (existingPublicKey.length !== 32 || !offer.sessionId || !offer.accountContractId) throw new Error("ペアリングコードを確認してください");
   const keyPair = createPairingKeyPair();
   if (passkey && (passkey.publicKey.length !== 65 || !passkey.credentialId)) throw new Error("新しい端末の鍵を確認してください");
   const response = pack(encryptPairingPayload(
@@ -102,7 +104,7 @@ export async function joinPairing(apiBaseUrl: string, inviteCode: string, option
     RESPONSE_AAD,
   ));
   await relayPairingPayload(apiBaseUrl, invite.token, response, fetcher);
-  return { existingPublicKey, keyPair, sessionId: offer.sessionId, token: invite.token };
+  return { existingPublicKey, keyPair, sessionId: offer.sessionId, token: invite.token, accountContractId: offer.accountContractId };
 }
 
 export async function confirmNewPairing(pairing: NewPairing): Promise<string> {
@@ -133,6 +135,23 @@ export async function reportPairingOutcome(apiBaseUrl: string, pairing: Existing
 
 export async function pollPairingOutcome(apiBaseUrl: string, pairing: NewPairing, fetcher: typeof fetch = fetch): Promise<boolean | null> {
   return getPairingOutcome(apiBaseUrl, pairing.token, fetcher);
+}
+
+/** The QR a host displays now encodes this join URL, so a phone's own camera app can open it directly. */
+export function buildDeviceJoinUrl(origin: string, inviteCode: string): string {
+  return `${origin}/device/join?invite=${inviteCode}`;
+}
+
+/** Accepts either a join URL (scanned by a system camera) or a bare invite code (pasted, or scanned in-app). */
+export function extractInviteCode(scanned: string): string {
+  try {
+    const url = new URL(scanned);
+    const invite = url.searchParams.get("invite");
+    if (invite) return invite;
+  } catch {
+    // not a URL -- treat the scanned text as a bare invite code
+  }
+  return scanned;
 }
 
 function decodeInvite(value: string): Invite {

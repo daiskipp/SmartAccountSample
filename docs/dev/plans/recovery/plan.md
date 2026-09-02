@@ -8,6 +8,7 @@
 - 待機後に新しいThreshold認可を集める。Protocol 27 localnetはsmart-account-kitから直接RPC提出し、TestnetはAxum relay gatewayからOpenZeppelin Relayer + Channels Pluginへ転送する。
 - Rule#Recoveryは完全一致するRule#0 signer replacementだけを許可するdeny-by-default設計とする。
 - L2ペアリングはFR-RECOVERY-07/08通りQRコード（`qrcode`生成・`jsqr`+カメラ読取）を主導線とし、コピペのテキストコードは`<details>`内のフォールバックとして残す。
+- 参加役（新端末）はまだパスキーを持たずログインできないため、ホスト役（既存端末、`DeviceManager`経由で`/app`配下）とは別に、ログイン不要の公開ルート`/device/join`（`DeviceJoin`、L3の`/guardian/join`と同じ形）に分離する。招待QRは招待コード文字列そのものではなく招待URL（`buildDeviceJoinUrl`で`/device/join?invite=<コード>`を生成）をエンコードし、新端末は標準カメラで読み取るだけで参加画面に招待コードが自動入力された状態で開ける。アプリ内カメラ読み取り・コード貼り付け（`extractInviteCode`でURL/生コードどちらも受理）はフォールバックとして残す。
 - L2の端末ニックネーム（FR-RECOVERY-13）はオフチェーン・ブラウザローカル（localStorage、WebAuthn公開鍵をキーに保存）で管理する。on-chainには影響せず、他端末には同期しない前提とする。
 - 既存端末は新端末からの応答をポーリングで自動検知し（手動の確認ボタンは廃止）、新端末はsigner追加が実際にon-chainで成功したかを`/api/pairing/sessions/{token}/complete`でポーリングして確認する。この結果は秘密材料を含まないため平文で中継する。
 - 端末管理UIは「一覧」と「追加（ペアリング）」を`DeviceManager`1カードに統合し、`DevicePairingSetup`は`embedded`propでCard chromeを省略してその内側に描画する。追加完了で自動的に一覧へ戻る。

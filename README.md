@@ -70,7 +70,7 @@ deletes its key at the end. Restart Vite if it was already running. Use
 `just localnet-reset` and `just localnet-deploy` separately when needed.
 The reset does not remove the dev container, source tree, or developer
 toolchain volumes. See
-[`docs/dev/localnet-deployment.md`](docs/dev/localnet-deployment.md) for the
+[`docs/dev/deployment/localnet.md`](docs/dev/deployment/localnet.md) for the
 scope and relayer notes.
 
 The relayer URL is public browser configuration; credentials remain on the
@@ -105,50 +105,34 @@ for browser clients or commit its tokens.
 
 To enable Testnet account creation and subsequent recovery setup through the
 fee-sponsored gateway, configure the server-only `RELAY_*` values documented
-in [`docs/dev/localnet-deployment.md`](docs/dev/localnet-deployment.md). In
+in [`docs/dev/deployment/testnet.md`](docs/dev/deployment/testnet.md). In
 particular, set both `RELAY_WASM_HASHES` and
 `RELAY_MANAGED_ACCOUNT_WASM_HASHES` to the intended Smart Account artifact.
 Only a Channels-confirmed deployment of that explicit artifact gains the fixed
 L1--L4 management relay surface; the browser receives no Channels credential.
+`just testnet-deploy` builds and deploys that artifact (and this repository's
+two recovery policies) to Testnet and writes both `frontend/.env.production`
+and the matching `RELAY_*` hashes; see `docs/dev/deployment/testnet.md` for
+what stays manual afterward (unlike localnet, it is not disposable — each run
+is a new, permanent Testnet deployment).
 
 ### Cloudflare Workers deployment (Testnet verification)
 
-`src/worker.rs` is a second entrypoint that runs the same `app::router_with_state`
-router inside a Cloudflare Worker, with a single Durable Object (`RecoveryStore`,
-SQLite storage backend, Workers Free plan-eligible) standing in for the native
-build's optional SQLite file. It talks to OpenZeppelin's hosted Testnet Channels
-service (`https://channels.openzeppelin.com/testnet`) instead of a self-hosted
-Relayer, so no Redis/Relayer containers need to be deployed. See `wrangler.toml`
-for the binding/env layout. Only `src/app.rs`'s persistence (`AppState::persist`)
-and outbound Channels call (`RelayGateway::send_to_channels`) differ per
-platform, behind `#[cfg(target_arch = "wasm32")]`; every route, handler, and the
-`Store` itself are unchanged and shared with the native binary.
+`src/worker.rs` is a second entrypoint that runs the same
+`app::router_with_state` router inside a Cloudflare Worker (Durable
+Object-backed storage, hosted Testnet Channels instead of a self-hosted
+Relayer). It covers L1--L3 only; L4 stays unwired regardless of deployment
+target.
 
 ```bash
-sudo apt-get install -y pkg-config libssl-dev   # one-time; worker-build's own build needs these
-cargo install worker-build --locked
-cargo check --target wasm32-unknown-unknown --lib   # type-check the Workers build
-wrangler login
-wrangler secret put RELAY_CHANNELS_API_KEY           # from https://channels.openzeppelin.com/testnet/gen
-wrangler deploy
+cargo check --target wasm32-unknown-unknown --lib
+pnpm wrangler deploy
 ```
 
-`wrangler deploy` runs `wrangler.toml`'s `[build].command`, which is
-`CARGO_PROFILE_RELEASE_STRIP=false worker-build --release` rather than plain
-`worker-build --release`. Cargo's `strip = true` (in the workspace
-`[profile.release]`, which otherwise shrinks the native binary) removes
-custom sections `wasm-bindgen`'s release-mode codegen needs, and the build
-fails with `externref table required for catch wrappers` without this
-override; `worker-build`'s own `wasm-opt` pass already shrinks the wasm
-output, so disabling Cargo's strip for this build costs nothing. Verified
-locally: `cargo build --release` (native, strip on) and
-`CARGO_PROFILE_RELEASE_STRIP=false worker-build --release` both succeed,
-producing a ~1.4 MB `build/index_bg.wasm`.
-
-Pair this with a Cloudflare Pages deployment of `frontend/dist` built against
-Testnet `VITE_*` values (see [`docs/dev/testnet-deployment.md`](docs/dev/testnet-deployment.md));
-`RELAY_ALLOWED_ORIGIN` in `wrangler.toml` must match that Pages origin exactly.
-L4 is out of scope here too (see the L4 note above) -- this covers L1--L3 only.
+See [`docs/dev/deployment/cloudflare.md`](docs/dev/deployment/cloudflare.md)
+for one-time setup (`worker-build`, `wrangler login`, the Channels API key),
+`wrangler.toml` configuration, the Pages frontend deploy, and verification
+steps.
 
 ## Status
 
@@ -175,7 +159,7 @@ the on-chain paths against the target network and audited policy deployments.
 
 A public Testnet deployment (custom policy WASM hashes and contract
 addresses) is recorded in
-[`docs/dev/testnet-deployment.md`](docs/dev/testnet-deployment.md).
+[`docs/dev/deployment/testnet.md`](docs/dev/deployment/testnet.md).
 
 ## Guardian recovery scope policy
 

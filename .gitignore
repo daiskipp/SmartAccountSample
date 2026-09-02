@@ -4,6 +4,9 @@
 frontend/node_modules
 frontend/dist
 /.pnpm-store
+
+# Local secrets for the root wrangler tooling (CLOUDFLARE_API_TOKEN etc.)
+/.env
 # worker-build output (wrangler.toml) and wrangler's local dev/deploy state
 /build
 .wrangler/
@@ -12,6 +15,7 @@ frontend/dist
 frontend/.env.local
 frontend/.env.production.local
 .devcontainer/localnet.env
+.devcontainer/testnet.env
 .devcontainer/.env
 
 # Test artifacts
@@ -27,3 +31,4 @@ tools/stellarview-explorer/
 
 # Claude Code local session/runtime state (machine-local, not project source)
 .claude/
+.tmp/

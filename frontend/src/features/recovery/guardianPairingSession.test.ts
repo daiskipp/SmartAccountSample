@@ -57,7 +57,7 @@ describe("guardian pairing session", () => {
     // An L2 device-pairing invite, decoded as if it were an L3 guardian invite:
     // the AAD domain differs, so decryption must fail rather than silently
     // succeed with garbage fields.
-    const l2Existing = await beginPairing("https://api.example", relay.fetcher);
+    const l2Existing = await beginPairing("https://api.example", "CACCOUNT", relay.fetcher);
     await expect(joinGuardianInvite("https://api.example", l2Existing.inviteCode, {
       candidate: { credentialId: "c", publicKey: new Uint8Array(65) },
     }, relay.fetcher)).rejects.toThrow();

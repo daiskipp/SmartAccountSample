@@ -30,7 +30,7 @@ new_sqlite_classes = ["RecoveryStore"]
 RELAY_CHANNELS_URL = "https://channels.openzeppelin.com/testnet"
 RELAY_NETWORK_PASSPHRASE = "Test SDF Network ; September 2015"
 # The frontend's exact Cloudflare Pages origin. Must match the deployed
-# Pages project's URL (see docs/dev/testnet-deployment.md and README.md);
+# Pages project's URL (see docs/dev/deployment/cloudflare.md and README.md);
 # CORS on /api/relay rejects every other origin.
 RELAY_ALLOWED_ORIGIN = "https://account-sample-verify.pages.dev"
 # smart-account-kit's shared, deterministic default deployer -- the same
@@ -38,8 +38,8 @@ RELAY_ALLOWED_ORIGIN = "https://account-sample-verify.pages.dev"
 # state). See node_modules/smart-account-kit/dist/utils.js.
 RELAY_WALLET_ROOTS = "GAAH4OT36RRCCAGKARGPN2HLHT2NOBVFHO4GUHA6CF7UKQ4MMV24WQ4N"
 RELAY_FUNCTIONS = ""
-# Testnet Smart Account WASM hash from docs/dev/testnet-deployment.md
-# (2026-08-24 deployment). Redeploy and update both values together if the
+# Testnet Smart Account WASM hash from docs/dev/deployment/testnet.md
+# (2026-09-01 deployment). Redeploy and update both values together if the
 # contract is ever redeployed.
-RELAY_WASM_HASHES = "070ef5dd25f681f092e171b9381444fec7a1d93737272cc57e67c232e048b366"
-RELAY_MANAGED_ACCOUNT_WASM_HASHES = "070ef5dd25f681f092e171b9381444fec7a1d93737272cc57e67c232e048b366"
+RELAY_WASM_HASHES = "8b650bdfe7942b2ab9791c4c975d7092481d4f29e956391532aa9767fe5f96d5"
+RELAY_MANAGED_ACCOUNT_WASM_HASHES = "8b650bdfe7942b2ab9791c4c975d7092481d4f29e956391532aa9767fe5f96d5"

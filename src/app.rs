@@ -23,10 +23,10 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::Mutex;
 use tower_http::cors::{AllowOrigin, CorsLayer};
+use web_time::{SystemTime, UNIX_EPOCH};
 
 const TTL_SECONDS: u64 = 300;
 /// Default lifetime for a pairing session when the caller does not request a
@@ -597,7 +597,15 @@ pub fn router_with_state(state: AppState) -> Router {
         CorsLayer::new()
             .allow_origin(AllowOrigin::exact(gateway.allowed_origin.clone()))
             .allow_methods([Method::POST])
-            .allow_headers([header::CONTENT_TYPE])
+            // smart-account-kit's RelayerClient always sends these two on
+            // every request (see node_modules/smart-account-kit/dist/relayer.js);
+            // without them allowed, the browser's preflight rejects the real
+            // POST before it ever reaches this handler.
+            .allow_headers([
+                header::CONTENT_TYPE,
+                header::HeaderName::from_static("x-client-name"),
+                header::HeaderName::from_static("x-client-version"),
+            ])
     });
     let router = Router::new()
         .route("/health", get(|| async { StatusCode::NO_CONTENT }))
@@ -1398,6 +1406,49 @@ mod tests {
                 .unwrap(),
             "https://frontend.example"
         );
+    }
+
+    #[tokio::test]
+    async fn relay_cors_allows_the_headers_smart_account_kit_actually_sends() {
+        // smart-account-kit's RelayerClient always sends X-Client-Name and
+        // X-Client-Version (see node_modules/smart-account-kit/dist/relayer.js);
+        // a preflight that only allows Content-Type makes the browser reject
+        // every real submission before it reaches this handler.
+        let state = AppState::default().with_relay_gateway(
+            RelayGateway::new(
+                TESTNET_CHANNELS_URL.into(),
+                "server-only-key".into(),
+                "https://frontend.example".into(),
+                RelayAllowlist::default(),
+            )
+            .unwrap(),
+        );
+        let response = router_with_state(state)
+            .oneshot(
+                Request::builder()
+                    .method("OPTIONS")
+                    .uri("/api/relay")
+                    .header("origin", "https://frontend.example")
+                    .header("access-control-request-method", "POST")
+                    .header(
+                        "access-control-request-headers",
+                        "content-type,x-client-name,x-client-version",
+                    )
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let allowed = response
+            .headers()
+            .get("access-control-allow-headers")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_ascii_lowercase();
+        for header in ["content-type", "x-client-name", "x-client-version"] {
+            assert!(allowed.contains(header), "missing {header} in {allowed}");
+        }
     }
 
     #[tokio::test]

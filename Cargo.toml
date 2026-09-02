@@ -32,6 +32,10 @@ stellar-strkey = "0.0.16"
 stellar-xdr = "22.1.0"
 subtle = "2.6"
 thiserror = "2"
+# Drop-in `std::time::{SystemTime, Instant}` that works on wasm32-unknown-unknown
+# (via `js-sys`/`Date.now()`) instead of panicking with "time not implemented
+# on this platform" -- plain `std::time` only has an OS clock on native targets.
+web-time = "1"
 # Only the `sync` feature (no reactor/threads) so this compiles unchanged for
 # both the native binary and the Workers/wasm32 target.
 tokio = { version = "1", default-features = false, features = ["sync"] }

@@ -27,3 +27,17 @@ explorer:
 contracts-build:
     stellar contract build --manifest-path contracts/recovery-scope-policy/Cargo.toml
     stellar contract build --manifest-path contracts/time-delay-policy/Cargo.toml
+
+# Build and deploy the Smart Account contract set to Stellar Testnet, and
+# write the matching public configuration to frontend/.env.production and
+# .devcontainer/testnet.env. Unlike localnet-deploy this is NOT disposable --
+# every run creates a new, permanent Testnet contract set. See
+# docs/dev/deployment/testnet.md.
+testnet-deploy:
+    ./.devcontainer/deploy-testnet-contracts.sh
+
+# Run the API against the Testnet contract set from testnet-deploy. Also set
+# RELAY_CHANNELS_API_KEY / RELAY_ALLOWED_ORIGIN / RELAY_CHANNELS_URL /
+# RELAY_NETWORK_PASSPHRASE / RECOVERY_NETWORK_PASSPHRASE first (not generated).
+api-testnet:
+    if [[ -f .devcontainer/testnet.env ]]; then source .devcontainer/testnet.env; fi; cargo run
