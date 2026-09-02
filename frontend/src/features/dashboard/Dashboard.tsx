@@ -36,7 +36,7 @@ export function Dashboard({ kit, accountContractId, onLogout }: DashboardProps):
       accountContractId={accountContractId}
       registerSigner={registerRecoverySigner}
     />
-    <DeviceManager kit={kit} webauthnVerifierAddress={import.meta.env.VITE_WEBAUTHN_VERIFIER_ADDRESS} />
+    <DeviceManager kit={kit} accountContractId={accountContractId} webauthnVerifierAddress={import.meta.env.VITE_WEBAUTHN_VERIFIER_ADDRESS} />
     <GuardianRecoverySetup
       kit={kit}
       accountContractId={accountContractId}

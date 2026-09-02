@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 
 interface DeviceManagerProps {
   kit: SmartAccountKit | null;
+  accountContractId: string | null;
   webauthnVerifierAddress?: string;
 }
 
@@ -32,7 +33,7 @@ function toDeviceRow(signer: ContractSigner, webauthnVerifierAddress?: string): 
   return { signer, publicKey: new Uint8Array(signer.values[1].subarray(0, 65)), credentialId };
 }
 
-export function DeviceManager({ kit, webauthnVerifierAddress }: DeviceManagerProps): React.JSX.Element {
+export function DeviceManager({ kit, accountContractId, webauthnVerifierAddress }: DeviceManagerProps): React.JSX.Element {
   const [view, setView] = useState<"list" | "add">("list");
   const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -81,7 +82,7 @@ export function DeviceManager({ kit, webauthnVerifierAddress }: DeviceManagerPro
     setRenameValue("");
   };
 
-  if (!kit) return <Card>
+  if (!kit || !accountContractId) return <Card>
     <CardHeader>
       <CardTitle>端末の管理</CardTitle>
       <CardDescription>アカウントを開くと、ここで端末を確認できます。</CardDescription>
@@ -98,6 +99,7 @@ export function DeviceManager({ kit, webauthnVerifierAddress }: DeviceManagerPro
         <Button variant="outline" size="sm" className="self-start" onClick={() => setView("list")}>← 一覧に戻る</Button>
         <DevicePairingSetup
           kit={kit}
+          accountContractId={accountContractId}
           webauthnVerifierAddress={webauthnVerifierAddress}
           embedded
           onDeviceAdded={() => { setView("list"); void load(); }}

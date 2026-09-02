@@ -26,10 +26,13 @@ describe("pairing session", () => {
       return new Response(JSON.stringify({ encrypted_payload: relayedPayload }), { status: 200 });
     });
 
-    const existing = await beginPairing("https://api.example", fetcher);
+    const existing = await beginPairing("https://api.example", "CACCOUNT123", fetcher);
     const passkey = { credentialId: "credential", publicKey: new Uint8Array(65).fill(7) };
     const newcomer = await joinPairing("https://api.example", existing.inviteCode, { passkey, nickname: "iPhone" }, fetcher);
 
+    // Without this, the new device has no way to know which account it was just
+    // added to, and a later login attempt can't find the right contract.
+    expect(newcomer.accountContractId).toBe("CACCOUNT123");
     await expect(confirmExistingPairing("https://api.example", existing, fetcher)).resolves.toEqual({
       sas: await confirmNewPairing(newcomer), passkey, nickname: "iPhone",
     });

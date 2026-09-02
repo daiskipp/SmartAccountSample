@@ -75,6 +75,17 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
         passkey: { credentialId: credential.credentialId, publicKey: credential.publicKey },
         nickname: joinNickname,
       });
+      // Without this, the SDK has no local record of which account this
+      // brand-new passkey belongs to, and a later login falls back to the
+      // address this credential *would* have deployed on its own -- not the
+      // existing account it was actually added to as a signer.
+      await kit.credentials.save({
+        credentialId: credential.credentialId,
+        publicKey: credential.publicKey,
+        contractId: pairing.accountContractId,
+        isPrimary: false,
+        nickname: joinNickname.trim() || "この端末",
+      });
       setNewPairing(pairing);
       setSas(await confirmNewPairing(pairing));
       setNewDeviceStatus("waiting");

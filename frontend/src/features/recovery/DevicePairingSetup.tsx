@@ -24,6 +24,7 @@ const POLL_INTERVAL_MS = 2000;
 
 interface DevicePairingSetupProps {
   kit: SmartAccountKit | null;
+  accountContractId: string;
   webauthnVerifierAddress?: string;
   /** Skips this component's own Card chrome when a parent already provides it. */
   embedded?: boolean;
@@ -32,7 +33,7 @@ interface DevicePairingSetupProps {
 }
 
 /** Host-side ("this device already has account access") half of L2 pairing. The join side lives at the public `/device/join` route, since a brand-new device has no passkey yet and cannot reach an authenticated screen. */
-export function DevicePairingSetup({ kit, webauthnVerifierAddress, embedded, onDeviceAdded }: DevicePairingSetupProps): React.JSX.Element {
+export function DevicePairingSetup({ kit, accountContractId, webauthnVerifierAddress, embedded, onDeviceAdded }: DevicePairingSetupProps): React.JSX.Element {
   const [existing, setExisting] = useState<ExistingPairing | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [sas, setSas] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export function DevicePairingSetup({ kit, webauthnVerifierAddress, embedded, onD
 
   const start = async (): Promise<void> => {
     try {
-      const pairing = await beginPairing(apiBaseUrl);
+      const pairing = await beginPairing(apiBaseUrl, accountContractId);
       setExisting(pairing);
       setQrDataUrl(await renderPairingQrCode(buildDeviceJoinUrl(window.location.origin, pairing.inviteCode)));
       setSas(null);
