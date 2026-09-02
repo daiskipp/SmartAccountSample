@@ -45,10 +45,16 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
   useEffect(() => {
     if (!newPairing || newDeviceStatus !== "waiting") return;
     let stopped = false;
+    let consecutiveErrors = 0;
+    // A transient network/Worker blip on one poll isn't the existing device
+    // reporting failure -- only give up after several in a row.
+    const MAX_CONSECUTIVE_ERRORS = 5;
     const timer = setInterval(() => {
       pollPairingOutcome(apiBaseUrl, newPairing)
         .then(async (outcome) => {
-          if (stopped || outcome === null) return;
+          if (stopped) return;
+          consecutiveErrors = 0;
+          if (outcome === null) return;
           clearInterval(timer);
           // Only save the account association once the signer addition is
           // confirmed on-chain -- saving it eagerly would leave a local
@@ -67,8 +73,11 @@ export function DeviceJoin({ kit, initialInviteCode }: DeviceJoinProps): React.J
         })
         .catch(() => {
           if (stopped) return;
-          clearInterval(timer);
-          setNewDeviceStatus("failure");
+          consecutiveErrors += 1;
+          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+            clearInterval(timer);
+            setNewDeviceStatus("failure");
+          }
         });
     }, POLL_INTERVAL_MS);
     return () => { stopped = true; clearInterval(timer); };
