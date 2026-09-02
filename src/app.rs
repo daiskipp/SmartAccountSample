@@ -23,10 +23,10 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::Mutex;
 use tower_http::cors::{AllowOrigin, CorsLayer};
+use web_time::{SystemTime, UNIX_EPOCH};
 
 const TTL_SECONDS: u64 = 300;
 /// Default lifetime for a pairing session when the caller does not request a

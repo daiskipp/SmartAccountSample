@@ -28,6 +28,7 @@ dependencies = [
  "tower-http",
  "tower-service",
  "wasm-bindgen",
+ "web-time",
  "worker",
 ]
 
